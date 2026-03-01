@@ -41,6 +41,8 @@ func main() {
 	}
 	collectionsPath := filepath.Join(homeDir, ".rocket-api", "collections")
 	historyPath := filepath.Join(homeDir, ".rocket-api", "history")
+	templatesPath := filepath.Join(homeDir, ".rocket-api", "templates")
+	cookiesPath := filepath.Join(homeDir, ".rocket-api", "cookies")
 
 	// Create repositories
 	repo := repository.NewCollectionRepository(collectionsPath)
@@ -51,6 +53,25 @@ func main() {
 	historyRepo := repository.NewHistoryRepository(historyPath)
 	if err := historyRepo.EnsureBasePath(); err != nil {
 		log.Fatalf("Failed to create history directory: %v", err)
+	}
+
+	templatesRepo := repository.NewTemplatesRepository(templatesPath)
+	if err := templatesRepo.EnsureBasePath(); err != nil {
+		log.Fatalf("Failed to create templates directory: %v", err)
+	}
+	// Create default templates
+	if err := templatesRepo.CreateDefaultTemplates(); err != nil {
+		log.Printf("Warning: Failed to create default templates: %v", err)
+	}
+
+	// Setup cookie jar
+	cookieRepo := repository.NewCookieRepository(cookiesPath)
+	if err := cookieRepo.EnsureBasePath(); err != nil {
+		log.Fatalf("Failed to create cookies directory: %v", err)
+	}
+	cookieJar := repository.NewCookieJar(cookieRepo)
+	if err := cookieJar.Load(); err != nil {
+		log.Printf("Warning: Failed to load cookies: %v", err)
 	}
 
 	// Setup file watcher
@@ -81,9 +102,13 @@ func main() {
 	collectionHandler := handlers.NewCollectionHandler(repo)
 	importExportHandler := handlers.NewImportExportHandler(repo)
 	historyHandler := handlers.NewHistoryHandler(historyRepo)
+	templatesHandler := handlers.NewTemplatesHandler(templatesRepo)
+	cookieHandler := handlers.NewCookieHandler(cookieJar)
 
 	// Set history repository for request tracking
 	handlers.SetHistoryRepository(historyRepo)
+	// Set cookie jar for request handling
+	handlers.SetCookieJar(cookieJar)
 
 	// Create router
 	r := mux.NewRouter()
@@ -125,6 +150,23 @@ func main() {
 	api.HandleFunc("/history", historyHandler.ClearHistory).Methods("DELETE", "OPTIONS")
 	api.HandleFunc("/history/detail", historyHandler.GetHistory).Methods("GET", "OPTIONS")
 	api.HandleFunc("/history/detail", historyHandler.DeleteHistory).Methods("DELETE", "OPTIONS")
+
+	// Templates routes
+	api.HandleFunc("/templates", templatesHandler.ListTemplates).Methods("GET", "OPTIONS")
+	api.HandleFunc("/templates", templatesHandler.CreateTemplate).Methods("POST", "OPTIONS")
+	api.HandleFunc("/templates/detail", templatesHandler.GetTemplate).Methods("GET", "OPTIONS")
+	api.HandleFunc("/templates/detail", templatesHandler.UpdateTemplate).Methods("PUT", "OPTIONS")
+	api.HandleFunc("/templates/detail", templatesHandler.DeleteTemplate).Methods("DELETE", "OPTIONS")
+	api.HandleFunc("/templates/categories", templatesHandler.GetCategories).Methods("GET", "OPTIONS")
+
+	// Cookie routes
+	api.HandleFunc("/cookies", cookieHandler.ListCookies).Methods("GET", "OPTIONS")
+	api.HandleFunc("/cookies", cookieHandler.CreateCookie).Methods("POST", "OPTIONS")
+	api.HandleFunc("/cookies", cookieHandler.ClearCookies).Methods("DELETE", "OPTIONS")
+	api.HandleFunc("/cookies/detail", cookieHandler.GetCookie).Methods("GET", "OPTIONS")
+	api.HandleFunc("/cookies/detail", cookieHandler.DeleteCookie).Methods("DELETE", "OPTIONS")
+	api.HandleFunc("/cookies/domains", cookieHandler.GetDomains).Methods("GET", "OPTIONS")
+	api.HandleFunc("/cookies/clear-expired", cookieHandler.ClearExpired).Methods("POST", "OPTIONS")
 
 	// Legacy request handler (for sending HTTP requests)
 	api.HandleFunc("/requests/send", handlers.SendRequestHandler).Methods("POST", "OPTIONS")

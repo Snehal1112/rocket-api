@@ -127,3 +127,32 @@ export interface HistoryEntry {
   body: string
   requestBody: string
 }
+
+export interface Template {
+  id: string
+  name: string
+  description: string
+  category: string
+  method: HttpMethod
+  url: string
+  headers: Record<string, string>
+  body: string
+  bodyType: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Cookie {
+  id: string
+  name: string
+  value: string
+  domain: string
+  path: string
+  expires: string
+  secure: boolean
+  httpOnly: boolean
+  sameSite: string
+  createdAt: string
+  updatedAt: string
+  collection?: string
+}

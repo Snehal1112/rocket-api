@@ -12,6 +12,15 @@ import { useHistoryStore } from '@/store/history'
 import { substituteRequestVariables } from '@/lib/environment'
 import { MonacoEditor } from '@/components/ui/monaco-editor'
 import { Play, Loader2, Plus, Check, X, FileText, Lock, Key, User, Upload, Save } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface RequestBuilderProps {
   onRequestSent?: (request: HttpRequest, response: HttpResponse) => void
@@ -35,6 +44,13 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
   const [activeTab, setActiveTab] = useState('params')
   const [responseTab, setResponseTab] = useState('body')
   const [bodyLanguage, setBodyLanguage] = useState('json')
+  
+  // Alert dialog state
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+  }>({ isOpen: false, title: '', description: '' })
   
   // Request store
   const {
@@ -74,7 +90,11 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
 
   const handleSaveRequest = async () => {
     if (!activeCollection) {
-      alert('Please select a collection first')
+      setAlertDialog({
+        isOpen: true,
+        title: 'No Collection Selected',
+        description: 'Please select a collection first before saving a request.'
+      })
       return
     }
     
@@ -786,6 +806,21 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
           </div>
         )}
       </div>
+
+      {/* Alert Dialog */}
+      <AlertDialog open={alertDialog.isOpen} onOpenChange={(open) => setAlertDialog(prev => ({ ...prev, isOpen: open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{alertDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>{alertDialog.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setAlertDialog(prev => ({ ...prev, isOpen: false }))}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

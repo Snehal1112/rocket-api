@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
-import { HttpRequest, HttpResponse, ApiResponse, Environment, HistoryEntry } from '@/types'
+import { HttpRequest, HttpResponse, ApiResponse, Environment, HistoryEntry, Template, Cookie } from '@/types'
 
 export interface CollectionNode {
   name: string
@@ -201,6 +201,57 @@ class ApiService {
 
   async clearHistory(): Promise<void> {
     await this.client.delete('/history')
+  }
+
+  // Templates
+  async getTemplates(category?: string): Promise<Template[]> {
+    const params = category ? `?category=${category}` : ''
+    const response = await this.client.get<ApiResponse<Template[]>>(`/templates${params}`)
+    return response.data.data || []
+  }
+
+  async getTemplateCategories(): Promise<string[]> {
+    const response = await this.client.get<ApiResponse<string[]>>('/templates/categories')
+    return response.data.data || []
+  }
+
+  async createTemplate(template: Omit<Template, 'id' | 'createdAt' | 'updatedAt'>): Promise<Template> {
+    const response = await this.client.post<ApiResponse<Template>>('/templates', template)
+    return response.data.data
+  }
+
+  async deleteTemplate(id: string): Promise<void> {
+    await this.client.delete(`/templates/detail?id=${id}`)
+  }
+
+  // Cookies
+  async getCookies(domain?: string): Promise<Cookie[]> {
+    const params = domain ? `?domain=${domain}` : ''
+    const response = await this.client.get<ApiResponse<Cookie[]>>(`/cookies${params}`)
+    return response.data.data || []
+  }
+
+  async getCookieDomains(): Promise<string[]> {
+    const response = await this.client.get<ApiResponse<string[]>>('/cookies/domains')
+    return response.data.data || []
+  }
+
+  async createCookie(cookie: Omit<Cookie, 'id' | 'createdAt' | 'updatedAt'>): Promise<Cookie> {
+    const response = await this.client.post<ApiResponse<Cookie>>('/cookies', cookie)
+    return response.data.data
+  }
+
+  async deleteCookie(id: string): Promise<void> {
+    await this.client.delete(`/cookies/detail?id=${id}`)
+  }
+
+  async clearCookies(): Promise<void> {
+    await this.client.delete('/cookies')
+  }
+
+  async clearExpiredCookies(): Promise<number> {
+    const response = await this.client.post<ApiResponse<number>>('/cookies/clear-expired')
+    return response.data.data || 0
   }
 }
 

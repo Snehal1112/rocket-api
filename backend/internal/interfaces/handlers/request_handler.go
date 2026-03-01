@@ -17,9 +17,17 @@ import (
 // historyRepo is set by main.go to enable history tracking
 var historyRepo *repository.HistoryRepository
 
+// cookieJar is set by main.go to enable cookie handling
+var cookieJar *repository.CookieJar
+
 // SetHistoryRepository sets the history repository for request tracking
 func SetHistoryRepository(repo *repository.HistoryRepository) {
 	historyRepo = repo
+}
+
+// SetCookieJar sets the cookie jar for request handling
+func SetCookieJar(jar *repository.CookieJar) {
+	cookieJar = jar
 }
 
 type FormDataField struct {
@@ -133,6 +141,14 @@ func SendRequestHandler(w http.ResponseWriter, r *http.Request) {
 	// Add headers
 	for key, value := range payload.Headers {
 		req.Header.Set(key, value)
+	}
+
+	// Add cookies from cookie jar
+	if cookieJar != nil {
+		cookieHeader := cookieJar.GetCookieHeader(finalURL)
+		if cookieHeader != "" {
+			req.Header.Set("Cookie", cookieHeader)
+		}
 	}
 
 	// Apply authentication
@@ -253,6 +269,16 @@ func SendRequestHandler(w http.ResponseWriter, r *http.Request) {
 	for key, values := range resp.Header {
 		if len(values) > 0 {
 			headers[key] = values[0]
+		}
+	}
+
+	// Parse and store Set-Cookie headers
+	if cookieJar != nil {
+		if setCookies, ok := resp.Header["Set-Cookie"]; ok {
+			for _, setCookie := range setCookies {
+				cookie := cookieJar.ParseSetCookie(setCookie, req.Host)
+				cookieJar.SetCookie(cookie)
+			}
 		}
 	}
 

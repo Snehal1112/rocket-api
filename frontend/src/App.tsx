@@ -2,12 +2,47 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RequestBuilder } from '@/components/request-builder/RequestBuilder'
 import { CollectionsSidebar } from '@/components/collections/CollectionsSidebar'
 import { EnvironmentsPanel } from '@/components/collections/EnvironmentsPanel'
-import { ThemeProvider } from 'next-themes'
-import { useState } from 'react'
+import { ThemeProvider, useTheme } from 'next-themes'
+import { useState, useEffect } from 'react'
 import { useWebSocket } from '@/hooks/use-websocket'
 import { useCollectionsStore } from '@/store/collections'
+import { Sun, Moon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 const queryClient = new QueryClient()
+
+// Theme Toggle Component
+function ThemeToggle() {
+  const { setTheme, resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  // Avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return <Button variant="ghost" size="icon" className="h-8 w-8" />
+  }
+
+  const isDark = resolvedTheme === 'dark'
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      className="h-8 w-8"
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {isDark ? (
+        <Sun className="h-4 w-4" />
+      ) : (
+        <Moon className="h-4 w-4" />
+      )}
+    </Button>
+  )
+}
 
 function App() {
   const [showEnvironments, setShowEnvironments] = useState(false)
@@ -36,7 +71,7 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light" storageKey="rocket-theme">
+      <ThemeProvider attribute="class" defaultTheme="light" storageKey="rocket-theme" enableSystem>
         <div className="h-screen flex flex-col bg-background font-sans text-sm">
           {/* Minimal Header - Bruno Style */}
           <header className="h-12 border-b border-border flex items-center px-4 bg-background shrink-0">
@@ -50,6 +85,7 @@ function App() {
             </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <button 
                 onClick={() => setShowEnvironments(!showEnvironments)}
                 className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
