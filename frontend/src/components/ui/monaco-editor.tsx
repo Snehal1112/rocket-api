@@ -1,5 +1,6 @@
 import Editor from '@monaco-editor/react'
 import { useTheme } from 'next-themes'
+import { useEffect, useState } from 'react'
 
 interface MonacoEditorProps {
   value: string
@@ -26,8 +27,27 @@ export function MonacoEditor({
   language = 'json',
   height = '200px',
 }: MonacoEditorProps) {
-  const { theme } = useTheme()
-  const editorTheme = theme === 'dark' ? 'vs-dark' : 'vs-light'
+  const { resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  // Avoid hydration mismatch - suppressHydrationWarning handles the mismatch
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const editorTheme = resolvedTheme === 'dark' ? 'vs-dark' : 'vs-light'
+
+  if (!mounted) {
+    return (
+      <div 
+        className="relative flex items-center justify-center bg-muted" 
+        style={{ height }}
+      >
+        <span className="text-sm text-muted-foreground">Loading editor...</span>
+      </div>
+    )
+  }
 
   return (
     <div className="relative" style={{ height }}>
@@ -51,7 +71,7 @@ export function MonacoEditor({
           formatOnType: true,
         }}
         loading={
-          <div className="flex items-center justify-center h-full text-sm text-gray-500">
+          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
             Loading editor...
           </div>
         }

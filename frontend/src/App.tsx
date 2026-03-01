@@ -16,7 +16,8 @@ function ThemeToggle() {
   const { setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
-  // Avoid hydration mismatch
+  // Avoid hydration mismatch - suppressHydrationWarning handles the mismatch
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -86,16 +87,14 @@ function App() {
             <div className="flex-1" />
             <div className="flex items-center gap-2">
               <ThemeToggle />
-              <button 
+              <Button 
+                variant={showEnvironments ? "secondary" : "ghost"}
+                size="sm"
                 onClick={() => setShowEnvironments(!showEnvironments)}
-                className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
-                  showEnvironments 
-                    ? 'bg-accent text-accent-foreground' 
-                    : 'hover:bg-accent/50 text-muted-foreground'
-                }`}
+                className="text-xs"
               >
                 Environments
-              </button>
+              </Button>
             </div>
           </header>
 
