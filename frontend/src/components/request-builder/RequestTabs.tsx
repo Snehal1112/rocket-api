@@ -12,17 +12,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Plus, X } from 'lucide-react'
-import type { HttpMethod } from '@/types'
-
-const METHOD_COLORS: Record<HttpMethod, string> = {
-  GET: 'text-blue-600',
-  POST: 'text-green-600',
-  PUT: 'text-yellow-600',
-  DELETE: 'text-red-600',
-  PATCH: 'text-purple-600',
-  HEAD: 'text-gray-500',
-  OPTIONS: 'text-gray-500',
-}
+import { METHOD_TEXT_COLORS } from '@/lib/constants'
 
 export function RequestTabs() {
   const { tabs, activeTabId, newTab, closeTab, setActiveTab } = useTabsStore()
@@ -51,35 +41,47 @@ export function RequestTabs() {
     <>
       <div className="flex items-center border-b border-border bg-muted/20 overflow-x-auto shrink-0">
         {tabs.map(tab => (
-          <button
+          <div
             key={tab.id}
+            role="tab"
+            tabIndex={0}
+            aria-selected={tab.id === activeTabId}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs border-r border-border shrink-0 max-w-[180px] group transition-colors ${
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setActiveTab(tab.id)
+              }
+            }}
+            className={`group flex items-center gap-1.5 px-3 py-2 text-xs border-r border-border cursor-pointer shrink-0 min-w-0 max-w-[180px] transition-colors ${
               tab.id === activeTabId
-                ? 'bg-background border-b-2 border-b-orange-500 -mb-px'
+                ? 'bg-background border-b-2 border-b-orange-500 -mb-px text-foreground'
                 : 'hover:bg-muted/50 text-muted-foreground'
             }`}
           >
             <span
-              className={`font-semibold text-[10px] shrink-0 ${METHOD_COLORS[tab.request.method]}`}
+              className={`font-semibold text-[10px] shrink-0 ${METHOD_TEXT_COLORS[tab.request.method]}`}
             >
               {tab.request.method}
             </span>
             <span className="truncate">{tab.request.name}</span>
             {tab.isDirty && (
-              <span className="text-orange-500 shrink-0 text-[10px]" title="Unsaved changes">
+              <span
+                className="text-orange-500 shrink-0 text-[10px]"
+                aria-label="Unsaved changes"
+              >
                 ●
               </span>
             )}
-            <span
-              role="button"
+            <button
+              type="button"
               aria-label="Close tab"
-              onClick={e => handleClose(e, tab.id)}
-              className="shrink-0 opacity-0 group-hover:opacity-100 hover:bg-muted rounded p-0.5 transition-opacity"
+              onClick={(e) => handleClose(e, tab.id)}
+              className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-foreground rounded-sm p-0.5 transition-opacity"
             >
               <X className="h-3 w-3" />
-            </span>
-          </button>
+            </button>
+          </div>
         ))}
 
         <Button
