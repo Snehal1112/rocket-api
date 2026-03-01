@@ -134,7 +134,7 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
     }
   }, [currentRequest?.id, activeTabId]) // Re-sync on request ID change or tab switch
 
-  const handleSaveRequest = async () => {
+  const handleSaveRequest = useCallback(async () => {
     if (!activeCollection) {
       setAlertDialog({
         isOpen: true,
@@ -143,7 +143,7 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
       })
       return
     }
-    
+
     // Flush local edits into the store before saving.
     updateActiveMethod(method)
     updateActiveUrl(url)
@@ -153,7 +153,7 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
     updateActiveAuth(auth)
 
     await saveActiveTab(activeCollection.name)
-  }
+  }, [activeCollection, method, url, headers, queryParams, body, auth, updateActiveMethod, updateActiveUrl, updateActiveHeaders, updateActiveQueryParams, updateActiveBody, updateActiveAuth, saveActiveTab])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -176,10 +176,9 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [url, method, headers, queryParams, body, auth, activeCollection])
 
-  const handleSubmit = async (e?: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!url.trim()) {
-      console.log('URL is empty, cannot send request')
       return
     }
 
@@ -191,10 +190,10 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
     updateActiveBody(body)
     updateActiveAuth(auth)
 
-    // Get active environment from collections store
+    // Get active environment from collections store.
     const { activeEnvironment } = useCollectionsStore.getState()
-    
-    // Substitute environment variables
+
+    // Substitute environment variables.
     const substituted = substituteRequestVariables(
       url,
       headers,
@@ -202,13 +201,12 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
       activeEnvironment
     )
 
-    console.log('Sending request to:', substituted.url)
     setActiveTabLoading(true)
-    
+
     try {
-      // Apply auth to headers
+      // Apply auth to headers.
       const finalHeaders = [...substituted.headers]
-      
+
       if (auth.type === 'bearer' && auth.bearer?.token) {
         finalHeaders.push({
           key: 'Authorization',
@@ -243,37 +241,32 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
         auth
       }
 
-      let response: HttpResponse
+      let httpResponse: HttpResponse
       let usedMockService = false
-      
+
       try {
-        console.log('Trying real API...')
-        response = await apiService.sendRequest(request)
-        console.log('Real API succeeded')
-      } catch (apiError) {
-        console.warn('Real API failed, using mock service:', apiError)
-        response = await mockApiService.sendRequest(request)
+        httpResponse = await apiService.sendRequest(request)
+      } catch {
+        httpResponse = await mockApiService.sendRequest(request)
         usedMockService = true
-        console.log('Mock service succeeded')
       }
 
-      // Add mock indicator to response if mock service was used
+      // Add mock indicator to response if mock service was used.
       if (usedMockService) {
-        response.headers = {
-          ...response.headers,
+        httpResponse.headers = {
+          ...httpResponse.headers,
           'X-Rocket-Mock': 'true'
         }
       }
 
-      setActiveTabResponse(response)
+      setActiveTabResponse(httpResponse)
 
-      // Refresh history after successful request
+      // Refresh history after successful request.
       const { fetchHistory } = useHistoryStore.getState()
       fetchHistory()
-      
-      if (onRequestSent) onRequestSent(request, response)
+
+      if (onRequestSent) onRequestSent(request, httpResponse)
     } catch (error) {
-      console.error('Request failed:', error)
       setActiveTabResponse({
         status: 0,
         statusText: 'Request Failed',
@@ -285,15 +278,15 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
     } finally {
       setActiveTabLoading(false)
     }
-  }
+  }, [url, method, headers, queryParams, body, auth, onRequestSent, updateActiveMethod, updateActiveUrl, updateActiveHeaders, updateActiveQueryParams, updateActiveBody, updateActiveAuth, setActiveTabLoading, setActiveTabResponse])
 
   // Header management
   const addHeader = () => setHeaders([...headers, { key: '', value: '', enabled: true }])
   const removeHeader = (index: number) => setHeaders(headers.filter((_, i) => i !== index))
   const updateHeader = (index: number, field: 'key' | 'value' | 'enabled', value: string | boolean) => {
-    const newHeaders = [...headers]
-    if (field === 'enabled') newHeaders[index].enabled = value as boolean
-    else newHeaders[index][field] = value as string
+    const newHeaders = headers.map((h, i) =>
+      i === index ? { ...h, [field]: value } : h
+    )
     setHeaders(newHeaders)
   }
 
@@ -301,9 +294,9 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
   const addQueryParam = () => setQueryParams([...queryParams, { key: '', value: '', enabled: true }])
   const removeQueryParam = (index: number) => setQueryParams(queryParams.filter((_, i) => i !== index))
   const updateQueryParam = (index: number, field: 'key' | 'value' | 'enabled', value: string | boolean) => {
-    const newParams = [...queryParams]
-    if (field === 'enabled') newParams[index].enabled = value as boolean
-    else newParams[index][field] = value as string
+    const newParams = queryParams.map((p, i) =>
+      i === index ? { ...p, [field]: value } : p
+    )
     setQueryParams(newParams)
   }
 
