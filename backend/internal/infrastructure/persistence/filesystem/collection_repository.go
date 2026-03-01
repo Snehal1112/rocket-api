@@ -24,12 +24,14 @@ func NewCollectionRepository(basePath string, log logger.Logger) *CollectionRepo
 }
 
 // Create stores a new collection by creating its directory.
+// The context parameter is reserved for future use (cancellation, deadlines).
 func (r *CollectionRepository) Create(ctx context.Context, col *collection.Collection) error {
-	if exists, _ := r.Exists(ctx, col.Name); exists {
-		return collection.ErrCollectionExists
-	}
-
-	if err := os.MkdirAll(col.Path, 0755); err != nil {
+	// Use os.Mkdir (not MkdirAll) for atomic creation that fails if directory exists.
+	// This prevents TOCTOU race condition between check and create.
+	if err := os.Mkdir(col.Path, 0755); err != nil {
+		if os.IsExist(err) {
+			return collection.ErrCollectionExists
+		}
 		return fmt.Errorf("failed to create collection directory: %w", err)
 	}
 
@@ -38,6 +40,7 @@ func (r *CollectionRepository) Create(ctx context.Context, col *collection.Colle
 }
 
 // FindByName retrieves a collection by its name.
+// The context parameter is reserved for future use (cancellation, deadlines).
 func (r *CollectionRepository) FindByName(ctx context.Context, name string) (*collection.Collection, error) {
 	col, err := collection.NewCollection(name, r.basePath)
 	if err != nil {
@@ -52,6 +55,7 @@ func (r *CollectionRepository) FindByName(ctx context.Context, name string) (*co
 }
 
 // FindAll retrieves all collections by reading directories.
+// The context parameter is reserved for future use (cancellation, deadlines).
 func (r *CollectionRepository) FindAll(ctx context.Context) ([]*collection.Collection, error) {
 	entries, err := os.ReadDir(r.basePath)
 	if err != nil {
@@ -77,6 +81,7 @@ func (r *CollectionRepository) FindAll(ctx context.Context) ([]*collection.Colle
 }
 
 // Update modifies an existing collection (currently a no-op for filesystem).
+// The context parameter is reserved for future use (cancellation, deadlines).
 func (r *CollectionRepository) Update(ctx context.Context, col *collection.Collection) error {
 	exists, err := r.Exists(ctx, col.Name)
 	if err != nil {
@@ -91,6 +96,7 @@ func (r *CollectionRepository) Update(ctx context.Context, col *collection.Colle
 }
 
 // Delete removes a collection by deleting its directory.
+// The context parameter is reserved for future use (cancellation, deadlines).
 func (r *CollectionRepository) Delete(ctx context.Context, name string) error {
 	col, err := r.FindByName(ctx, name)
 	if err != nil {
@@ -106,6 +112,7 @@ func (r *CollectionRepository) Delete(ctx context.Context, name string) error {
 }
 
 // Exists checks if a collection with the given name exists.
+// The context parameter is reserved for future use (cancellation, deadlines).
 func (r *CollectionRepository) Exists(ctx context.Context, name string) (bool, error) {
 	col, err := collection.NewCollection(name, r.basePath)
 	if err != nil {
