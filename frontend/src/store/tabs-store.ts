@@ -91,10 +91,11 @@ export const useTabsStore = create<TabsState>((set, get) => {
 
       const idx = tabs.findIndex(t => t.id === id)
       const newTabs = tabs.filter(t => t.id !== id)
+      const currentActiveId = get().activeTabId
       const newActiveId =
-        get().activeTabId === id
+        currentActiveId === id
           ? newTabs[Math.max(0, idx - 1)].id
-          : get().activeTabId
+          : currentActiveId
 
       set({ tabs: newTabs, activeTabId: newActiveId })
     },
