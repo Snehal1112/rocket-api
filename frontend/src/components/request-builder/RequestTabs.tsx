@@ -89,7 +89,7 @@ export function RequestTabs() {
           size="icon"
           onClick={newTab}
           className="h-8 w-8 shrink-0 rounded-none"
-          title="New tab"
+          aria-label="New tab"
         >
           <Plus className="h-3.5 w-3.5" />
         </Button>
