@@ -10,6 +10,7 @@ import { useTabsStore } from '@/store/tabs-store'
 import { useCollectionsStore } from '@/store/collections'
 import { useHistoryStore } from '@/store/history'
 import { substituteRequestVariables } from '@/lib/environment'
+import { METHOD_TEXT_COLORS } from '@/lib/constants'
 import { MonacoEditor } from '@/components/ui/monaco-editor'
 import { Play, Loader2, Plus, Check, X, FileText, Lock, Key, User, Upload, Save, Copy } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -29,15 +30,6 @@ interface RequestBuilderProps {
 
 const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']
 
-const METHOD_COLORS: Record<HttpMethod, string> = {
-  GET: 'text-blue-600 bg-blue-50 border-blue-200',
-  POST: 'text-green-600 bg-green-50 border-green-200',
-  PUT: 'text-yellow-600 bg-yellow-50 border-yellow-200',
-  DELETE: 'text-red-600 bg-red-50 border-red-200',
-  PATCH: 'text-purple-600 bg-purple-50 border-purple-200',
-  HEAD: 'text-gray-600 bg-gray-50 border-gray-200',
-  OPTIONS: 'text-gray-600 bg-gray-50 border-gray-200',
-}
 
 export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
   const [activeTab, setActiveTab] = useState('params')
@@ -377,7 +369,7 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
           <TooltipProvider>
             <form onSubmit={handleSubmit} className="flex gap-3">
               <Select value={method} onValueChange={(v) => setMethod(v as HttpMethod)}>
-                <SelectTrigger className={`w-[110px] font-semibold text-sm ${METHOD_COLORS[method]} border-2`}>
+                <SelectTrigger className={`w-[110px] h-9 font-semibold text-sm ${METHOD_TEXT_COLORS[method]}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -405,10 +397,10 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
               
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={isLoading}
-                    size="default"
+                    size="sm"
                     className="bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50 font-semibold px-4"
                   >
                     {isLoading ? (
@@ -426,10 +418,10 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
               
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
+                  <Button
                     type="button"
                     variant="outline"
-                    size="default"
+                    size="sm"
                     onClick={handleSaveRequest}
                     disabled={!activeCollection}
                     className={`font-medium px-3 ${isDirty ? 'border-orange-300 text-orange-600 hover:bg-orange-50' : ''}`}
