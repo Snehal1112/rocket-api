@@ -416,28 +416,22 @@ export function CollectionsSidebar() {
                 <div key={collection.id}>
                   {/* Collection Header */}
                   <div
-                    className={`flex items-center gap-1 px-2 py-1.5 hover:bg-accent/50 transition-colors group ${
+                    className={`flex items-center gap-1 px-2 py-1.5 hover:bg-accent/50 transition-colors group cursor-pointer ${
                       isActive ? 'bg-accent/40' : ''
                     }`}
+                    onClick={() => {
+                      toggleCollection(collection.id)
+                      setActiveCollection(collection)
+                    }}
                   >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => toggleCollection(collection.id)}
-                      className="shrink-0 h-5 w-5"
-                    >
+                    <span className="shrink-0 h-5 w-5 flex items-center justify-center">
                       {isExpanded ? (
-                        <ChevronDown className="h-3.5 w-3.5" />
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                       ) : (
-                        <ChevronRight className="h-3.5 w-3.5" />
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                       )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setActiveCollection(collection)}
-                      className="flex items-center gap-1.5 flex-1 text-left min-w-0 h-auto justify-start"
-                    >
+                    </span>
+                    <span className="flex items-center gap-1.5 flex-1 min-w-0">
                       {isExpanded ? (
                         <FolderOpen className="h-4 w-4 text-orange-500 shrink-0" />
                       ) : (
@@ -447,13 +441,16 @@ export function CollectionsSidebar() {
                       <span className="text-[10px] text-muted-foreground shrink-0">
                         ({collection.requestCount})
                       </span>
-                    </Button>
-                    
-                    {/* Collection Actions */}
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    </span>
+
+                    {/* Action icons — stop propagation so clicks don't toggle the row. */}
+                    <div
+                      className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button 
+                          <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleExportBruno(collection.name)}
@@ -466,7 +463,7 @@ export function CollectionsSidebar() {
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button 
+                          <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDeleteCollection(collection.name)}
@@ -481,7 +478,7 @@ export function CollectionsSidebar() {
                   </div>
 
                   {/* Collection Tree */}
-                  {isExpanded && isActive && collectionTree?.children && (
+                  {isExpanded && collectionTree?.children && (
                     <div className="border-l border-border/50 ml-4">
                       {collectionTree.children.map(child => renderTreeNode(child, 0))}
                     </div>
