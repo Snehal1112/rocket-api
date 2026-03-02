@@ -140,8 +140,8 @@ func ParseContent(content string) (*BruFile, error) {
 		}
 
 		// Block open: a line ending with " {" or just "{".
-		if strings.HasSuffix(trimmed, "{") {
-			blockName := strings.TrimSpace(strings.TrimSuffix(trimmed, "{"))
+		if name, ok := strings.CutSuffix(trimmed, "{"); ok {
+			blockName := strings.TrimSpace(name)
 			contextStack = append(contextStack, blockName)
 			if blockName == "data" {
 				inDataBlock = true
@@ -344,8 +344,7 @@ func GenerateContent(bru *BruFile) string {
 		}
 		if bodyContent != "" {
 			content.WriteString("  data {\n")
-			lines := strings.Split(bodyContent, "\n")
-			for _, line := range lines {
+			for line := range strings.SplitSeq(bodyContent, "\n") {
 				fmt.Fprintf(&content, "    %s\n", line)
 			}
 			content.WriteString("  }\n")
