@@ -210,8 +210,6 @@ func (r *CollectionRepository) GetCollectionStructure(collectionName string) (*C
 				node.Name = bruFile.Meta.Name
 				node.Method = bruFile.HTTP.Method
 			}
-		} else if strings.HasSuffix(info.Name(), ".env") {
-			node.Type = "environment"
 		} else {
 			node.Type = "file"
 		}
