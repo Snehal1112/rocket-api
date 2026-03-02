@@ -114,6 +114,12 @@ export function CollectionsSidebar() {
   
   const { loadRequestFromPath, loadRequestInActiveTab } = useTabsStore()
 
+  // Read the active tab's file path for highlighting the active request.
+  const activeTabFilePath = useTabsStore(state => {
+    const tab = state.tabs.find(t => t.id === state.activeTabId)
+    return tab?.filePath ?? null
+  })
+
   useEffect(() => {
     fetchCollections()
   }, [fetchCollections])
@@ -159,6 +165,21 @@ export function CollectionsSidebar() {
         setAlertDialog(prev => ({ ...prev, isOpen: false }))
       }
     })
+  }
+
+  const handleRenameConfirm = async () => {
+    const node = renameDialog.node
+    if (!node || !node.path || !activeCollection || !renameValue.trim()) return
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const bruFile = await apiService.getRequest(activeCollection.name, node.path) as any
+      bruFile.meta.name = renameValue.trim()
+      await apiService.saveRequest(activeCollection.name, node.path, bruFile)
+      await fetchCollectionTree(activeCollection.name)
+    } catch (error) {
+      console.error('Failed to rename request:', error)
+    }
+    setRenameDialog({ isOpen: false, node: null })
   }
 
   const handleImportBruno = async () => {
@@ -278,11 +299,11 @@ export function CollectionsSidebar() {
     collection.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const renderTreeNode = (node: TreeNode, level: number = 0) => {
+  const renderTreeNode = (node: TreeNode, level: number = 0, activeFilePath: string | null = null) => {
     const paddingLeft = level * 16 + 8
 
     if (node.type === 'request') {
-      const isActiveRequest = false // TODO: wire to active tab
+      const isActiveRequest = activeFilePath !== null && activeFilePath === node.path
 
       return (
         <div
@@ -387,7 +408,7 @@ export function CollectionsSidebar() {
           </Button>
           {isExpanded && node.children && (
             <div>
-              {node.children.map(child => renderTreeNode(child, level + 1))}
+              {node.children.map(child => renderTreeNode(child, level + 1, activeFilePath))}
             </div>
           )}
         </div>
@@ -551,7 +572,7 @@ export function CollectionsSidebar() {
                   {/* Collection Tree */}
                   {isExpanded && isActive && collectionTree?.children && (
                     <div className="border-l border-border/50 ml-4">
-                      {collectionTree.children.map(child => renderTreeNode(child, 0))}
+                      {collectionTree.children.map(child => renderTreeNode(child, 0, activeTabFilePath))}
                     </div>
                   )}
                 </div>
@@ -991,6 +1012,10 @@ export function CollectionsSidebar() {
             <Input
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRenameConfirm()
+              }}
+              autoFocus
               className="h-9 text-sm"
             />
           </div>
@@ -998,13 +1023,14 @@ export function CollectionsSidebar() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setRenameDialog(prev => ({ ...prev, isOpen: false }))}
+              onClick={() => setRenameDialog({ isOpen: false, node: null })}
               className="h-8 px-4 text-sm font-normal"
             >
               Cancel
             </Button>
             <Button
               size="sm"
+              onClick={handleRenameConfirm}
               disabled={!renameValue.trim()}
               className="h-8 px-4 text-sm font-medium"
             >
