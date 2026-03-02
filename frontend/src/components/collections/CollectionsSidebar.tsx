@@ -26,12 +26,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { 
-  Folder, 
+import {
+  Folder,
   FolderOpen,
-  FileText, 
-  Plus, 
-  ChevronRight, 
+  Plus,
+  ChevronRight,
   ChevronDown,
   Search,
   Clock,
@@ -40,8 +39,15 @@ import {
   Trash2,
   Loader2,
   LayoutTemplate,
-  Cookie
+  Cookie,
+  MoreHorizontal,
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface TreeNode {
   name: string
@@ -77,8 +83,15 @@ export function CollectionsSidebar() {
     onConfirm: () => void
   }>({ isOpen: false, title: '', description: '', onConfirm: () => {} })
   
+  // Rename dialog state
+  const [renameDialog, setRenameDialog] = useState<{ isOpen: boolean; node: TreeNode | null }>({
+    isOpen: false,
+    node: null,
+  })
+  const [renameValue, setRenameValue] = useState('')
+
   // History store
-  const { 
+  const {
     entries: historyEntries, 
     isLoading: historyLoading, 
     fetchHistory 
@@ -252,13 +265,13 @@ export function CollectionsSidebar() {
 
   const getMethodColor = (method?: string) => {
     const colors: Record<string, string> = {
-      GET: 'text-blue-600',
-      POST: 'text-green-600',
-      PUT: 'text-yellow-600',
-      DELETE: 'text-red-600',
-      PATCH: 'text-purple-600',
+      GET: 'bg-blue-100 text-blue-700',
+      POST: 'bg-green-100 text-green-700',
+      PUT: 'bg-yellow-100 text-yellow-700',
+      DELETE: 'bg-red-100 text-red-700',
+      PATCH: 'bg-purple-100 text-purple-700',
     }
-    return colors[method || 'GET'] || 'text-gray-600'
+    return colors[method?.toUpperCase() || 'GET'] || 'bg-gray-100 text-gray-600'
   }
 
   const filteredCollections = (collections || []).filter(collection => 
@@ -269,27 +282,76 @@ export function CollectionsSidebar() {
     const paddingLeft = level * 16 + 8
 
     if (node.type === 'request') {
+      const isActiveRequest = false // TODO: wire to active tab
+
       return (
-        <Button
+        <div
           key={node.path || node.name}
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            if (activeCollection && node.path) {
-              loadRequestFromPath(activeCollection.name, node.path)
-            }
-          }}
-          className="w-full justify-start gap-2 px-2 py-1.5 h-auto hover:bg-accent/50 group"
+          className={`flex items-center group hover:bg-accent/50 transition-colors ${
+            isActiveRequest ? 'border-l-2 border-primary bg-accent/60' : 'border-l-2 border-transparent'
+          }`}
           style={{ paddingLeft: `${paddingLeft + 24}px` }}
         >
-          <span className={`text-[10px] font-semibold w-10 shrink-0 ${getMethodColor(node.method)}`}>
-            {node.method || 'GET'}
-          </span>
-          <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <span className="truncate text-left text-muted-foreground group-hover:text-foreground text-xs">
-            {node.name}
-          </span>
-        </Button>
+          <button
+            type="button"
+            className="flex items-center gap-2 flex-1 min-w-0 py-1.5 pr-1 text-left"
+            onClick={() => {
+              if (activeCollection && node.path) {
+                loadRequestFromPath(activeCollection.name, node.path)
+              }
+            }}
+          >
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded w-[42px] text-center shrink-0 ${getMethodColor(node.method)}`}>
+              {node.method || 'GET'}
+            </span>
+            <span className="truncate text-xs text-foreground">
+              {node.name}
+            </span>
+          </button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded hover:bg-accent shrink-0 mr-1"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-36">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setRenameDialog({ isOpen: true, node })
+                  setRenameValue(node.name)
+                }}
+              >
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setAlertDialog({
+                    isOpen: true,
+                    title: 'Delete Request',
+                    description: `Are you sure you want to delete "${node.name}"? This action cannot be undone.`,
+                    onConfirm: async () => {
+                      if (activeCollection && node.path) {
+                        await apiService.deleteRequest(activeCollection.name, node.path)
+                        await fetchCollectionTree(activeCollection.name)
+                      }
+                      setAlertDialog(prev => ({ ...prev, isOpen: false }))
+                    }
+                  })
+                }}
+              >
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       )
     }
 
@@ -912,6 +974,41 @@ export function CollectionsSidebar() {
               className="h-8 px-4 text-sm font-normal"
             >
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Dialog */}
+      <Dialog open={renameDialog.isOpen} onOpenChange={(open) => setRenameDialog(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent className="sm:max-w-[420px] gap-0 p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-4 space-y-1">
+            <DialogTitle className="text-base font-semibold tracking-tight">
+              Rename Request
+            </DialogTitle>
+          </DialogHeader>
+          <div className="px-6 pb-5">
+            <Input
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              className="h-9 text-sm"
+            />
+          </div>
+          <DialogFooter className="px-6 py-4 border-t bg-muted/40 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRenameDialog(prev => ({ ...prev, isOpen: false }))}
+              className="h-8 px-4 text-sm font-normal"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={!renameValue.trim()}
+              className="h-8 px-4 text-sm font-medium"
+            >
+              Rename
             </Button>
           </DialogFooter>
         </DialogContent>
