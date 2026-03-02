@@ -58,8 +58,8 @@ type BruFile struct {
 		Type string `json:"type"`
 		Data string `json:"data,omitempty"`
 	} `json:"body"`
-	Vars       map[string]interface{} `json:"vars,omitempty"`
-	Assertions []string               `json:"assertions,omitempty"`
+	Vars       map[string]any `json:"vars,omitempty"`
+	Assertions []string       `json:"assertions,omitempty"`
 }
 
 // Parse reads and parses a .bru file
@@ -87,7 +87,7 @@ func ParseContent(content string) (*BruFile, error) {
 			Headers:     []Header{},
 			QueryParams: []QueryParam{},
 		},
-		Vars:       make(map[string]interface{}),
+		Vars:       make(map[string]any),
 		Assertions: []string{},
 	}
 
@@ -156,10 +156,10 @@ func ParseContent(content string) (*BruFile, error) {
 			parseMetaLine(trimmed, bru)
 
 		case "http":
-			if strings.HasPrefix(trimmed, "method:") {
-				bru.HTTP.Method = strings.TrimSpace(strings.TrimPrefix(trimmed, "method:"))
-			} else if strings.HasPrefix(trimmed, "url:") {
-				bru.HTTP.URL = strings.TrimSpace(strings.TrimPrefix(trimmed, "url:"))
+			if v, ok := strings.CutPrefix(trimmed, "method:"); ok {
+				bru.HTTP.Method = strings.TrimSpace(v)
+			} else if v, ok := strings.CutPrefix(trimmed, "url:"); ok {
+				bru.HTTP.URL = strings.TrimSpace(v)
 			}
 
 		case "headers":
@@ -181,8 +181,8 @@ func ParseContent(content string) (*BruFile, error) {
 			}
 
 		case "auth":
-			if strings.HasPrefix(trimmed, "type:") {
-				authType := strings.TrimSpace(strings.TrimPrefix(trimmed, "type:"))
+			if v, ok := strings.CutPrefix(trimmed, "type:"); ok {
+				authType := strings.TrimSpace(v)
 				bru.HTTP.Auth = &AuthConfig{Type: authType}
 				// Pre-allocate sub-struct so later lines can fill it in.
 				switch authType {
@@ -206,32 +206,34 @@ func ParseContent(content string) (*BruFile, error) {
 				switch bru.HTTP.Auth.Type {
 				case "basic":
 					if bru.HTTP.Auth.Basic != nil {
-						if strings.HasPrefix(trimmed, "username:") {
-							bru.HTTP.Auth.Basic.Username = strings.TrimSpace(strings.TrimPrefix(trimmed, "username:"))
-						} else if strings.HasPrefix(trimmed, "password:") {
-							bru.HTTP.Auth.Basic.Password = strings.TrimSpace(strings.TrimPrefix(trimmed, "password:"))
+						if v, ok := strings.CutPrefix(trimmed, "username:"); ok {
+							bru.HTTP.Auth.Basic.Username = strings.TrimSpace(v)
+						} else if v, ok := strings.CutPrefix(trimmed, "password:"); ok {
+							bru.HTTP.Auth.Basic.Password = strings.TrimSpace(v)
 						}
 					}
 				case "bearer":
-					if bru.HTTP.Auth.Bearer != nil && strings.HasPrefix(trimmed, "token:") {
-						bru.HTTP.Auth.Bearer.Token = strings.TrimSpace(strings.TrimPrefix(trimmed, "token:"))
+					if bru.HTTP.Auth.Bearer != nil {
+						if v, ok := strings.CutPrefix(trimmed, "token:"); ok {
+							bru.HTTP.Auth.Bearer.Token = strings.TrimSpace(v)
+						}
 					}
 				case "api-key":
 					if bru.HTTP.Auth.APIKey != nil {
-						if strings.HasPrefix(trimmed, "key:") {
-							bru.HTTP.Auth.APIKey.Key = strings.TrimSpace(strings.TrimPrefix(trimmed, "key:"))
-						} else if strings.HasPrefix(trimmed, "value:") {
-							bru.HTTP.Auth.APIKey.Value = strings.TrimSpace(strings.TrimPrefix(trimmed, "value:"))
-						} else if strings.HasPrefix(trimmed, "in:") {
-							bru.HTTP.Auth.APIKey.In = strings.TrimSpace(strings.TrimPrefix(trimmed, "in:"))
+						if v, ok := strings.CutPrefix(trimmed, "key:"); ok {
+							bru.HTTP.Auth.APIKey.Key = strings.TrimSpace(v)
+						} else if v, ok := strings.CutPrefix(trimmed, "value:"); ok {
+							bru.HTTP.Auth.APIKey.Value = strings.TrimSpace(v)
+						} else if v, ok := strings.CutPrefix(trimmed, "in:"); ok {
+							bru.HTTP.Auth.APIKey.In = strings.TrimSpace(v)
 						}
 					}
 				}
 			}
 
 		case "body":
-			if strings.HasPrefix(trimmed, "type:") {
-				bru.Body.Type = strings.TrimSpace(strings.TrimPrefix(trimmed, "type:"))
+			if v, ok := strings.CutPrefix(trimmed, "type:"); ok {
+				bru.Body.Type = strings.TrimSpace(v)
 			}
 		}
 	}
@@ -248,13 +250,13 @@ func ParseContent(content string) (*BruFile, error) {
 }
 
 func parseMetaLine(line string, bru *BruFile) {
-	if strings.HasPrefix(line, "name:") {
-		bru.Meta.Name = strings.TrimSpace(strings.TrimPrefix(line, "name:"))
+	if v, ok := strings.CutPrefix(line, "name:"); ok {
+		bru.Meta.Name = strings.TrimSpace(v)
 		bru.Meta.Name = strings.Trim(bru.Meta.Name, `"`)
-	} else if strings.HasPrefix(line, "type:") {
-		bru.Meta.Type = strings.TrimSpace(strings.TrimPrefix(line, "type:"))
-	} else if strings.HasPrefix(line, "seq:") {
-		seqStr := strings.TrimSpace(strings.TrimPrefix(line, "seq:"))
+	} else if v, ok := strings.CutPrefix(line, "type:"); ok {
+		bru.Meta.Type = strings.TrimSpace(v)
+	} else if v, ok := strings.CutPrefix(line, "seq:"); ok {
+		seqStr := strings.TrimSpace(v)
 		if seq, err := strconv.Atoi(seqStr); err == nil {
 			bru.Meta.Seq = seq
 		}
@@ -273,24 +275,24 @@ func GenerateContent(bru *BruFile) string {
 
 	// Meta section
 	content.WriteString("meta {\n")
-	content.WriteString(fmt.Sprintf("  name: %s\n", bru.Meta.Name))
-	content.WriteString(fmt.Sprintf("  type: %s\n", bru.Meta.Type))
+	fmt.Fprintf(&content, "  name: %s\n", bru.Meta.Name)
+	fmt.Fprintf(&content, "  type: %s\n", bru.Meta.Type)
 	if bru.Meta.Seq > 0 {
-		content.WriteString(fmt.Sprintf("  seq: %d\n", bru.Meta.Seq))
+		fmt.Fprintf(&content, "  seq: %d\n", bru.Meta.Seq)
 	}
 	content.WriteString("}\n\n")
 
 	// HTTP section
 	content.WriteString("http {\n")
-	content.WriteString(fmt.Sprintf("  method: %s\n", bru.HTTP.Method))
-	content.WriteString(fmt.Sprintf("  url: %s\n", bru.HTTP.URL))
+	fmt.Fprintf(&content, "  method: %s\n", bru.HTTP.Method)
+	fmt.Fprintf(&content, "  url: %s\n", bru.HTTP.URL)
 
 	// Query Params
 	if len(bru.HTTP.QueryParams) > 0 {
 		content.WriteString("  query {\n")
 		for _, q := range bru.HTTP.QueryParams {
 			if q.Enabled {
-				content.WriteString(fmt.Sprintf("    %s: %s\n", q.Key, q.Value))
+				fmt.Fprintf(&content, "    %s: %s\n", q.Key, q.Value)
 			}
 		}
 		content.WriteString("  }\n")
@@ -300,7 +302,7 @@ func GenerateContent(bru *BruFile) string {
 	if len(bru.HTTP.Headers) > 0 {
 		content.WriteString("  headers {\n")
 		for _, h := range bru.HTTP.Headers {
-			content.WriteString(fmt.Sprintf("    %s: %s\n", h.Key, h.Value))
+			fmt.Fprintf(&content, "    %s: %s\n", h.Key, h.Value)
 		}
 		content.WriteString("  }\n")
 	}
@@ -308,23 +310,23 @@ func GenerateContent(bru *BruFile) string {
 	// Auth
 	if bru.HTTP.Auth != nil && bru.HTTP.Auth.Type != "none" {
 		content.WriteString("  auth {\n")
-		content.WriteString(fmt.Sprintf("    type: %s\n", bru.HTTP.Auth.Type))
-		
+		fmt.Fprintf(&content, "    type: %s\n", bru.HTTP.Auth.Type)
+
 		switch bru.HTTP.Auth.Type {
 		case "basic":
 			if bru.HTTP.Auth.Basic != nil {
-				content.WriteString(fmt.Sprintf("    username: %s\n", bru.HTTP.Auth.Basic.Username))
-				content.WriteString(fmt.Sprintf("    password: %s\n", bru.HTTP.Auth.Basic.Password))
+				fmt.Fprintf(&content, "    username: %s\n", bru.HTTP.Auth.Basic.Username)
+				fmt.Fprintf(&content, "    password: %s\n", bru.HTTP.Auth.Basic.Password)
 			}
 		case "bearer":
 			if bru.HTTP.Auth.Bearer != nil {
-				content.WriteString(fmt.Sprintf("    token: %s\n", bru.HTTP.Auth.Bearer.Token))
+				fmt.Fprintf(&content, "    token: %s\n", bru.HTTP.Auth.Bearer.Token)
 			}
 		case "api-key":
 			if bru.HTTP.Auth.APIKey != nil {
-				content.WriteString(fmt.Sprintf("    key: %s\n", bru.HTTP.Auth.APIKey.Key))
-				content.WriteString(fmt.Sprintf("    value: %s\n", bru.HTTP.Auth.APIKey.Value))
-				content.WriteString(fmt.Sprintf("    in: %s\n", bru.HTTP.Auth.APIKey.In))
+				fmt.Fprintf(&content, "    key: %s\n", bru.HTTP.Auth.APIKey.Key)
+				fmt.Fprintf(&content, "    value: %s\n", bru.HTTP.Auth.APIKey.Value)
+				fmt.Fprintf(&content, "    in: %s\n", bru.HTTP.Auth.APIKey.In)
 			}
 		}
 		content.WriteString("  }\n")
@@ -334,7 +336,7 @@ func GenerateContent(bru *BruFile) string {
 	// Body section
 	if bru.Body.Type != "" && bru.Body.Type != "none" {
 		content.WriteString("body {\n")
-		content.WriteString(fmt.Sprintf("  type: %s\n", bru.Body.Type))
+		fmt.Fprintf(&content, "  type: %s\n", bru.Body.Type)
 		// Body.Data is set by the frontend save path; HTTP.Body is the legacy field.
 		bodyContent := bru.Body.Data
 		if bodyContent == "" {
@@ -344,7 +346,7 @@ func GenerateContent(bru *BruFile) string {
 			content.WriteString("  data {\n")
 			lines := strings.Split(bodyContent, "\n")
 			for _, line := range lines {
-				content.WriteString(fmt.Sprintf("    %s\n", line))
+				fmt.Fprintf(&content, "    %s\n", line)
 			}
 			content.WriteString("  }\n")
 		}
@@ -357,9 +359,9 @@ func GenerateContent(bru *BruFile) string {
 		for key, value := range bru.Vars {
 			switch v := value.(type) {
 			case string:
-				content.WriteString(fmt.Sprintf("  %s: \"%s\"\n", key, v))
+				fmt.Fprintf(&content, "  %s: \"%s\"\n", key, v)
 			default:
-				content.WriteString(fmt.Sprintf("  %s: %v\n", key, v))
+				fmt.Fprintf(&content, "  %s: %v\n", key, v)
 			}
 		}
 		content.WriteString("}\n\n")
@@ -369,7 +371,7 @@ func GenerateContent(bru *BruFile) string {
 	if len(bru.Assertions) > 0 {
 		content.WriteString("assertions {\n")
 		for _, assertion := range bru.Assertions {
-			content.WriteString(fmt.Sprintf("  - %s\n", assertion))
+			fmt.Fprintf(&content, "  - %s\n", assertion)
 		}
 		content.WriteString("}\n")
 	}
