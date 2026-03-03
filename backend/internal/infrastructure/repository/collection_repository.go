@@ -190,6 +190,10 @@ func (r *CollectionRepository) GetCollectionStructure(collectionName string) (*C
 		if !info.IsDir() && strings.HasSuffix(info.Name(), ".env") {
 			return nil
 		}
+		// Skip collection.bru — it holds collection-level vars, not a request.
+		if !info.IsDir() && info.Name() == "collection.bru" {
+			return nil
+		}
 
 		relPath, err := filepath.Rel(collectionPath, path)
 		if err != nil {
