@@ -190,15 +190,16 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
     updateActiveBody(body)
     updateActiveAuth(auth)
 
-    // Get active environment from collections store.
-    const { activeEnvironment } = useCollectionsStore.getState()
+    // Get active environment and collection variables from collections store.
+    const { activeEnvironment, collectionVariables } = useCollectionsStore.getState()
 
-    // Substitute environment variables.
+    // Substitute environment variables and collection variables.
     const substituted = substituteRequestVariables(
       url,
       headers,
       body.content,
-      activeEnvironment
+      activeEnvironment,
+      collectionVariables
     )
 
     setActiveTabLoading(true)
