@@ -413,11 +413,13 @@ func formatCollectionVars(vars []CollectionVar) string {
 
 	sb.WriteString("vars {\n")
 	for _, v := range vars {
+		// Collect secret keys regardless of enabled state so disabled+secret
+		// vars survive a round-trip without losing their secret flag.
+		if v.Secret {
+			secretKeys = append(secretKeys, v.Key)
+		}
 		if v.Enabled {
 			fmt.Fprintf(&sb, "  %s: %s\n", v.Key, v.Value)
-			if v.Secret {
-				secretKeys = append(secretKeys, v.Key)
-			}
 		} else {
 			// Write disabled vars with ~ prefix so they survive a round-trip.
 			fmt.Fprintf(&sb, "  ~%s: %s\n", v.Key, v.Value)

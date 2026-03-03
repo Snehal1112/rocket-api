@@ -437,6 +437,26 @@ func (h *CollectionHandler) SaveCollectionVars(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Preserve stored secret values when the client sends an empty placeholder.
+	// GetCollectionVars masks secret values as "" before sending them to the
+	// client, so a save without a new value must not erase the stored secret.
+	existing, err := h.repo.ReadCollectionVars(name)
+	if err == nil && len(existing) > 0 {
+		existingByKey := make(map[string]string, len(existing))
+		for _, v := range existing {
+			if v.Secret {
+				existingByKey[v.Key] = v.Value
+			}
+		}
+		for i, v := range payload.Variables {
+			if v.Secret && v.Value == "" {
+				if stored, ok := existingByKey[v.Key]; ok {
+					payload.Variables[i].Value = stored
+				}
+			}
+		}
+	}
+
 	// An empty slice is valid — it clears all existing collection variables.
 	if err := h.repo.WriteCollectionVars(name, payload.Variables); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to save collection variables: %v", err), http.StatusInternalServerError)

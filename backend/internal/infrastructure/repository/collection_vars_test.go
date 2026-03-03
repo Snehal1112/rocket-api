@@ -85,6 +85,28 @@ func TestParseCollectionVars_DisabledPrefix(t *testing.T) {
 	}
 }
 
+func TestParseFormatRoundTrip_DisabledSecret(t *testing.T) {
+	original := []CollectionVar{
+		{Key: "token", Value: "my-token", Enabled: false, Secret: true},
+	}
+
+	content := formatCollectionVars(original)
+	parsed := parseCollectionVars(content)
+
+	if len(parsed) != 1 {
+		t.Fatalf("expected 1 var, got %d", len(parsed))
+	}
+	if parsed[0].Key != "token" {
+		t.Errorf("expected key 'token', got %q", parsed[0].Key)
+	}
+	if parsed[0].Secret != true {
+		t.Errorf("expected secret=true for disabled+secret var, got false")
+	}
+	if parsed[0].Enabled != false {
+		t.Errorf("expected enabled=false, got true")
+	}
+}
+
 func TestParseFormatRoundTrip(t *testing.T) {
 	original := []CollectionVar{
 		{Key: "baseUrl", Value: "https://api.example.com", Enabled: true, Secret: false},
