@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Environment } from '@/types'
+import { Environment, CollectionVar } from '@/types'
 import { apiService, CollectionSummary, CollectionNode } from '@/lib/api'
 
 interface CollectionsState {
@@ -8,6 +8,9 @@ interface CollectionsState {
   environments: Environment[]
   activeCollection: CollectionSummary | null
   activeEnvironment: Environment | null
+  collectionVariables: CollectionVar[]
+  fetchCollectionVariables: (name: string) => Promise<void>
+  saveCollectionVariables: (name: string, vars: CollectionVar[]) => Promise<void>
   isLoading: boolean
   error: string | null
   
@@ -39,6 +42,7 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
   environments: [],
   activeCollection: null,
   activeEnvironment: null,
+  collectionVariables: [],
   isLoading: false,
   error: null,
   
@@ -102,7 +106,7 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
   },
   
   setActiveCollection: (collection: CollectionSummary | null) => {
-    set({ activeCollection: collection, activeEnvironment: null })
+    set({ activeCollection: collection, activeEnvironment: null, collectionVariables: [] })
     if (collection) {
       get().fetchEnvironments(collection.name).then(() => {
         // Restore last-used environment for this collection.
@@ -112,6 +116,7 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
           if (env) set({ activeEnvironment: env })
         }
       })
+      get().fetchCollectionVariables(collection.name)
     }
   },
   
@@ -169,6 +174,20 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
       get().setActiveEnvironment(null)
     }
     await get().fetchEnvironments(collectionName)
+  },
+
+  fetchCollectionVariables: async (name: string) => {
+    try {
+      const vars = await apiService.getCollectionVariables(name)
+      set({ collectionVariables: vars })
+    } catch (error) {
+      console.error('Failed to fetch collection variables:', error)
+    }
+  },
+
+  saveCollectionVariables: async (name: string, vars: CollectionVar[]) => {
+    await apiService.saveCollectionVariables(name, vars)
+    set({ collectionVariables: vars })
   },
 
   importBruno: async (file: File, name?: string) => {
