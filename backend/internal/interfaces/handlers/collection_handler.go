@@ -267,6 +267,9 @@ func (h *CollectionHandler) DeleteRequest(w http.ResponseWriter, r *http.Request
 }
 
 // ListEnvironments handles GET /api/v1/collections/{collection}/environments
+// ListEnvironments handles GET /api/v1/environments.
+// When the "name" query param is present it returns the single named environment;
+// otherwise it returns the list of environment names for the collection.
 func (h *CollectionHandler) ListEnvironments(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
@@ -281,6 +284,22 @@ func (h *CollectionHandler) ListEnvironments(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Single-environment fetch when name is provided.
+	if envName := query.Get("name"); envName != "" {
+		env, err := h.repo.ReadEnvironment(collection, envName)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to read environment: %v", err), http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"data":    env,
+			"success": true,
+			"message": "Environment retrieved successfully",
+		})
+		return
+	}
+
 	envs, err := h.repo.ListEnvironments(collection)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to list environments: %v", err), http.StatusInternalServerError)
@@ -292,36 +311,6 @@ func (h *CollectionHandler) ListEnvironments(w http.ResponseWriter, r *http.Requ
 		"data":    envs,
 		"success": true,
 		"message": "Environments retrieved successfully",
-	})
-}
-
-// GetEnvironment handles GET /api/v1/collections/{collection}/environments/{name}
-func (h *CollectionHandler) GetEnvironment(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	query := r.URL.Query()
-	collection := query.Get("collection")
-	envName := query.Get("name")
-
-	if collection == "" || envName == "" {
-		http.Error(w, "Collection and environment name are required", http.StatusBadRequest)
-		return
-	}
-
-	env, err := h.repo.ReadEnvironment(collection, envName)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to read environment: %v", err), http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"data":    env,
-		"success": true,
-		"message": "Environment retrieved successfully",
 	})
 }
 
