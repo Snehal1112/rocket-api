@@ -53,7 +53,7 @@ func TestFormatCollectionVars_Basic(t *testing.T) {
 	}
 }
 
-func TestFormatCollectionVars_DisabledVarSkipped(t *testing.T) {
+func TestFormatCollectionVars_DisabledVarWrittenWithTilde(t *testing.T) {
 	vars := []CollectionVar{
 		{Key: "active", Value: "yes", Enabled: true, Secret: false},
 		{Key: "inactive", Value: "no", Enabled: false, Secret: false},
@@ -61,11 +61,27 @@ func TestFormatCollectionVars_DisabledVarSkipped(t *testing.T) {
 
 	content := formatCollectionVars(vars)
 
-	if !strings.Contains(content, "active: yes") {
-		t.Error("expected active var in output")
+	if !strings.Contains(content, "  active: yes") {
+		t.Error("expected active var without tilde")
 	}
-	if strings.Contains(content, "inactive") {
-		t.Error("disabled var should not appear in output")
+	if !strings.Contains(content, "  ~inactive: no") {
+		t.Error("expected disabled var with ~ prefix")
+	}
+}
+
+func TestParseCollectionVars_DisabledPrefix(t *testing.T) {
+	content := "vars {\n  active: yes\n  ~inactive: no\n}\n"
+
+	vars := parseCollectionVars(content)
+
+	if len(vars) != 2 {
+		t.Fatalf("expected 2 vars, got %d", len(vars))
+	}
+	if vars[0].Key != "active" || !vars[0].Enabled {
+		t.Errorf("expected active var enabled, got %+v", vars[0])
+	}
+	if vars[1].Key != "inactive" || vars[1].Enabled {
+		t.Errorf("expected inactive var disabled, got %+v", vars[1])
 	}
 }
 

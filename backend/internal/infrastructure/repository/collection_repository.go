@@ -379,10 +379,17 @@ func parseCollectionVars(content string) []CollectionVar {
 		case inVarsBlock && trimmed != "":
 			parts := strings.SplitN(trimmed, ":", 2)
 			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				enabled := true
+				// Bruno uses ~ prefix to mark a var as disabled.
+				if strings.HasPrefix(key, "~") {
+					key = key[1:]
+					enabled = false
+				}
 				vars = append(vars, CollectionVar{
-					Key:     strings.TrimSpace(parts[0]),
+					Key:     key,
 					Value:   strings.TrimSpace(parts[1]),
-					Enabled: true,
+					Enabled: enabled,
 				})
 			}
 		case inSecretBlock && trimmed != "":
@@ -411,6 +418,9 @@ func formatCollectionVars(vars []CollectionVar) string {
 			if v.Secret {
 				secretKeys = append(secretKeys, v.Key)
 			}
+		} else {
+			// Write disabled vars with ~ prefix so they survive a round-trip.
+			fmt.Fprintf(&sb, "  ~%s: %s\n", v.Key, v.Value)
 		}
 	}
 	sb.WriteString("}\n")
