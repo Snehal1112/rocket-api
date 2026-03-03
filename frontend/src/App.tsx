@@ -3,7 +3,6 @@ import { RequestBuilder } from '@/components/request-builder/RequestBuilder'
 import { RequestTabs } from '@/components/request-builder/RequestTabs'
 import { CollectionsSidebar } from '@/components/collections/CollectionsSidebar'
 import { CollectionOverview } from '@/components/collections/CollectionOverview'
-import { EnvironmentsPanel } from '@/components/collections/EnvironmentsPanel'
 import { ThemeProvider, useTheme } from 'next-themes'
 import { useState, useEffect } from 'react'
 import { useWebSocket } from '@/hooks/use-websocket'
@@ -49,7 +48,6 @@ function ThemeToggle() {
 }
 
 function App() {
-  const [showEnvironments, setShowEnvironments] = useState(false)
   const { fetchCollections, fetchCollectionTree, activeCollection } = useCollectionsStore()
   const activeTab = useTabsStore(state => state.tabs.find(t => t.id === state.activeTabId))
   
@@ -91,14 +89,6 @@ function App() {
             <div className="flex-1" />
             <div className="flex items-center gap-2">
               <ThemeToggle />
-              <Button 
-                variant={showEnvironments ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setShowEnvironments(!showEnvironments)}
-                className="text-xs"
-              >
-                Environments
-              </Button>
             </div>
           </header>
 
@@ -118,11 +108,6 @@ function App() {
                 />
               )}
             </main>
-            
-            {/* Right Panel - Environments (Collapsible) */}
-            {showEnvironments && (
-              <EnvironmentsPanel />
-            )}
           </div>
         </div>
       </ThemeProvider>
