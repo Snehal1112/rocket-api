@@ -154,6 +154,12 @@ class ApiService {
     })
   }
 
+  async deleteEnvironment(collection: string, name: string): Promise<void> {
+    await this.client.delete('/environments', {
+      params: { collection, name }
+    })
+  }
+
   // Import/Export
   async importBruno(file: File, name?: string): Promise<CollectionSummary> {
     const formData = new FormData()

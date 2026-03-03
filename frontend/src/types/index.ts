@@ -90,6 +90,7 @@ export interface EnvironmentVariable {
   key: string
   value: string
   enabled: boolean
+  secret: boolean
 }
 
 export interface BruFile {

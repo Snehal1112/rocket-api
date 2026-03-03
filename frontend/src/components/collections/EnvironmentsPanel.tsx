@@ -40,7 +40,7 @@ export function EnvironmentsPanel() {
   }
 
   const handleAddVariable = () => {
-    setEditingVars([...editingVars, { key: '', value: '', enabled: true }])
+    setEditingVars([...editingVars, { key: '', value: '', enabled: true, secret: false }])
   }
 
   const handleUpdateVariable = (index: number, updates: Partial<EnvironmentVariable>) => {
