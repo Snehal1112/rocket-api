@@ -363,7 +363,7 @@ func parseCollectionVars(content string) []CollectionVar {
 	inVarsBlock := false
 	inSecretBlock := false
 
-	for _, line := range strings.Split(content, "\n") {
+	for line := range strings.SplitSeq(content, "\n") {
 		trimmed := strings.TrimSpace(line)
 
 		switch {
