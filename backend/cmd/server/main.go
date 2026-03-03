@@ -139,6 +139,10 @@ func main() {
 	api.HandleFunc("/environments", collectionHandler.SaveEnvironment).Methods("POST", "OPTIONS")
 	api.HandleFunc("/environments", collectionHandler.DeleteEnvironment).Methods("DELETE", "OPTIONS")
 
+	// Collection variable routes
+	api.HandleFunc("/collections/{name}/variables", collectionHandler.GetCollectionVars).Methods("GET", "OPTIONS")
+	api.HandleFunc("/collections/{name}/variables", collectionHandler.SaveCollectionVars).Methods("POST", "OPTIONS")
+
 	// Import/Export routes
 	api.HandleFunc("/import/bruno", importExportHandler.ImportBruno).Methods("POST", "OPTIONS")
 	api.HandleFunc("/export/bruno", importExportHandler.ExportBruno).Methods("GET", "OPTIONS")
