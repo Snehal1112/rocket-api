@@ -2,8 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/yourusername/rocket-api/internal/infrastructure/repository"
@@ -42,12 +45,20 @@ func (h *CollectionHandler) ListCollections(w http.ResponseWriter, r *http.Reque
 		}
 
 		// Count requests
-		requestCount := 0
-		for _, child := range structure.Children {
-			if child.Type == "request" {
-				requestCount++
+		var countRequests func(nodes []repository.CollectionNode) int
+		countRequests = func(nodes []repository.CollectionNode) int {
+			total := 0
+			for _, node := range nodes {
+				if node.Type == "request" {
+					total++
+				}
+				if len(node.Children) > 0 {
+					total += countRequests(node.Children)
+				}
 			}
+			return total
 		}
+		requestCount := countRequests(structure.Children)
 
 		result = append(result, map[string]interface{}{
 			"id":           name,
@@ -164,6 +175,49 @@ func (h *CollectionHandler) DeleteCollection(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+// CreateFolder handles POST /api/v1/collections/{name}/folders
+func (h *CollectionHandler) CreateFolder(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	collectionName := mux.Vars(r)["name"]
+	if strings.TrimSpace(collectionName) == "" {
+		http.Error(w, "Collection name is required", http.StatusBadRequest)
+		return
+	}
+
+	var payload struct {
+		ParentPath string `json:"parentPath"`
+		FolderName string `json:"folderName"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	createdPath, err := h.repo.CreateFolder(collectionName, payload.ParentPath, payload.FolderName)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			http.Error(w, "Folder already exists", http.StatusConflict)
+			return
+		}
+		http.Error(w, fmt.Sprintf("Failed to create folder: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"path": createdPath,
+		},
+		"success": true,
+		"message": "Folder created successfully",
+	})
+}
+
 // GetRequest handles GET /api/v1/collections/{collection}/requests/{path}
 func (h *CollectionHandler) GetRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "OPTIONS" {
@@ -236,6 +290,50 @@ func (h *CollectionHandler) SaveRequest(w http.ResponseWriter, r *http.Request) 
 		},
 		"success": true,
 		"message": "Request saved successfully",
+	})
+}
+
+// CreateRequest handles POST /api/v1/collections/{name}/requests/new
+func (h *CollectionHandler) CreateRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	collectionName := mux.Vars(r)["name"]
+	if strings.TrimSpace(collectionName) == "" {
+		http.Error(w, "Collection name is required", http.StatusBadRequest)
+		return
+	}
+
+	var payload struct {
+		ParentPath  string `json:"parentPath"`
+		RequestName string `json:"requestName"`
+		Method      string `json:"method"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	createdPath, err := h.repo.CreateRequest(collectionName, payload.ParentPath, payload.RequestName, payload.Method)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			http.Error(w, "Request already exists", http.StatusConflict)
+			return
+		}
+		http.Error(w, fmt.Sprintf("Failed to create request: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"path": createdPath,
+		},
+		"success": true,
+		"message": "Request created successfully",
 	})
 }
 
@@ -351,8 +449,8 @@ func (h *CollectionHandler) SaveEnvironment(w http.ResponseWriter, r *http.Reque
 	}
 
 	var payload struct {
-		Collection string                       `json:"collection"`
-		Environment *repository.Environment     `json:"environment"`
+		Collection  string                  `json:"collection"`
+		Environment *repository.Environment `json:"environment"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)

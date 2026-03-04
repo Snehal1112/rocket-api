@@ -1,9 +1,11 @@
 package repository
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/yourusername/rocket-api/pkg/bru"
@@ -162,6 +164,98 @@ func (r *CollectionRepository) WriteBruFile(collectionName, filePath string, bru
 	return r.WriteFile(collectionName, filePath, []byte(content))
 }
 
+func normalizeRelativePath(input string) (string, error) {
+	if input == "" {
+		return "", nil
+	}
+
+	normalized := filepath.Clean(filepath.FromSlash(input))
+	if normalized == "." {
+		return "", nil
+	}
+	if filepath.IsAbs(normalized) {
+		return "", fmt.Errorf("absolute path is not allowed")
+	}
+	if normalized == ".." || strings.HasPrefix(normalized, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("path traversal is not allowed")
+	}
+	return normalized, nil
+}
+
+func validateNodeName(name string) error {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return fmt.Errorf("name is required")
+	}
+	if strings.Contains(trimmed, "/") || strings.Contains(trimmed, "\\") {
+		return fmt.Errorf("path separators are not allowed in name")
+	}
+	if strings.Contains(trimmed, "..") {
+		return fmt.Errorf("invalid name")
+	}
+	return nil
+}
+
+// CreateFolder creates a folder at collection root or under parentPath.
+func (r *CollectionRepository) CreateFolder(collectionName, parentPath, folderName string) (string, error) {
+	if err := validateNodeName(folderName); err != nil {
+		return "", err
+	}
+
+	safeParent, err := normalizeRelativePath(parentPath)
+	if err != nil {
+		return "", err
+	}
+
+	targetRel := filepath.Join(safeParent, strings.TrimSpace(folderName))
+	targetFull := filepath.Join(r.basePath, collectionName, targetRel)
+
+	if st, statErr := os.Stat(targetFull); statErr == nil && st.IsDir() {
+		return "", os.ErrExist
+	} else if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
+		return "", statErr
+	}
+
+	if err := os.MkdirAll(targetFull, 0755); err != nil {
+		return "", fmt.Errorf("failed to create folder: %w", err)
+	}
+
+	return filepath.ToSlash(targetRel), nil
+}
+
+// CreateRequest creates a starter .bru request at root or under parentPath.
+func (r *CollectionRepository) CreateRequest(collectionName, parentPath, requestName, method string) (string, error) {
+	if err := validateNodeName(requestName); err != nil {
+		return "", err
+	}
+
+	safeParent, err := normalizeRelativePath(parentPath)
+	if err != nil {
+		return "", err
+	}
+
+	method = strings.ToUpper(strings.TrimSpace(method))
+	if method == "" {
+		method = "GET"
+	}
+
+	fileName := strings.TrimSpace(requestName) + ".bru"
+	targetRel := filepath.Join(safeParent, fileName)
+	targetFull := filepath.Join(r.basePath, collectionName, targetRel)
+	if _, statErr := os.Stat(targetFull); statErr == nil {
+		return "", os.ErrExist
+	} else if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
+		return "", statErr
+	}
+
+	content := fmt.Sprintf("meta {\n  name: %s\n  type: http\n  seq: 1\n}\n\nhttp {\n  method: %s\n  url:\n}\n\nbody {\n  type: none\n}\n", requestName, method)
+	if err := r.WriteFile(collectionName, targetRel, []byte(content)); err != nil {
+		return "", err
+	}
+
+	return filepath.ToSlash(targetRel), nil
+}
+
 // GetCollectionStructure returns the folder structure of a collection
 func (r *CollectionRepository) GetCollectionStructure(collectionName string) (*CollectionNode, error) {
 	collectionPath := filepath.Join(r.basePath, collectionName)
@@ -170,6 +264,35 @@ func (r *CollectionRepository) GetCollectionStructure(collectionName string) (*C
 		Name:     collectionName,
 		Type:     "collection",
 		Children: []CollectionNode{},
+	}
+
+	findNode := func(children []CollectionNode, name, nodeType string) *CollectionNode {
+		for i := range children {
+			if children[i].Name == name && children[i].Type == nodeType {
+				return &children[i]
+			}
+		}
+		return nil
+	}
+
+	ensureFolderPath := func(parts []string) *CollectionNode {
+		current := root
+		accumulated := make([]string, 0, len(parts))
+		for _, part := range parts {
+			accumulated = append(accumulated, part)
+			existing := findNode(current.Children, part, "folder")
+			if existing == nil {
+				current.Children = append(current.Children, CollectionNode{
+					Name:     part,
+					Type:     "folder",
+					Path:     filepath.ToSlash(filepath.Join(accumulated...)),
+					Children: []CollectionNode{},
+				})
+				existing = &current.Children[len(current.Children)-1]
+			}
+			current = existing
+		}
+		return current
 	}
 
 	err := filepath.Walk(collectionPath, func(path string, info os.FileInfo, err error) error {
@@ -195,10 +318,14 @@ func (r *CollectionRepository) GetCollectionStructure(collectionName string) (*C
 			return nil
 		}
 
-		relPath, err := filepath.Rel(collectionPath, path)
+		relPathRaw, err := filepath.Rel(collectionPath, path)
 		if err != nil {
 			return err
 		}
+		relPath := filepath.ToSlash(relPathRaw)
+		parts := strings.Split(relPath, "/")
+		parentParts := parts[:len(parts)-1]
+		parent := ensureFolderPath(parentParts)
 
 		node := CollectionNode{
 			Name: info.Name(),
@@ -206,7 +333,8 @@ func (r *CollectionRepository) GetCollectionStructure(collectionName string) (*C
 		}
 
 		if info.IsDir() {
-			node.Type = "folder"
+			ensureFolderPath(parts)
+			return nil
 		} else if strings.HasSuffix(info.Name(), ".bru") {
 			node.Type = "request"
 			// Try to parse the bru file to get the request name
@@ -218,14 +346,44 @@ func (r *CollectionRepository) GetCollectionStructure(collectionName string) (*C
 			node.Type = "file"
 		}
 
-		// Add to parent's children (simplified - assumes flat structure for now)
-		root.Children = append(root.Children, node)
+		// Folder nodes are created in ensureFolderPath from parent traversal.
+		if info.IsDir() {
+			return nil
+		}
+		parent.Children = append(parent.Children, node)
 		return nil
 	})
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get collection structure: %w", err)
 	}
+
+	var sortNodes func(nodes []CollectionNode)
+	sortNodes = func(nodes []CollectionNode) {
+		sort.Slice(nodes, func(i, j int) bool {
+			typeWeight := func(nodeType string) int {
+				switch nodeType {
+				case "folder":
+					return 0
+				case "request":
+					return 1
+				default:
+					return 2
+				}
+			}
+			iw, jw := typeWeight(nodes[i].Type), typeWeight(nodes[j].Type)
+			if iw != jw {
+				return iw < jw
+			}
+			return strings.ToLower(nodes[i].Name) < strings.ToLower(nodes[j].Name)
+		})
+		for i := range nodes {
+			if len(nodes[i].Children) > 0 {
+				sortNodes(nodes[i].Children)
+			}
+		}
+	}
+	sortNodes(root.Children)
 
 	return root, nil
 }

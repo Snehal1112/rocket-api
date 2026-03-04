@@ -64,6 +64,18 @@ export function CollectionsSidebar() {
   const [activeTab, setActiveTab] = useState<'collections' | 'history'>('collections')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newCollectionName, setNewCollectionName] = useState('')
+  const [createNodeDialog, setCreateNodeDialog] = useState<{
+    isOpen: boolean
+    kind: 'folder' | 'request'
+    collectionName: string | null
+    parentPath: string | null
+  }>({
+    isOpen: false,
+    kind: 'folder',
+    collectionName: null,
+    parentPath: null,
+  })
+  const [newNodeName, setNewNodeName] = useState('')
   const [isTemplatesDialogOpen, setIsTemplatesDialogOpen] = useState(false)
   const [templates, setTemplates] = useState<Template[]>([])
   const [templateCategories, setTemplateCategories] = useState<string[]>([])
@@ -230,6 +242,84 @@ export function CollectionsSidebar() {
         setAlertDialog(prev => ({ ...prev, isOpen: false }))
       }
     })
+  }
+
+  const openCreateNodeDialog = (
+    kind: 'folder' | 'request',
+    collectionName: string,
+    parentPath: string | null
+  ) => {
+    setCreateNodeDialog({
+      isOpen: true,
+      kind,
+      collectionName,
+      parentPath,
+    })
+    setNewNodeName('')
+  }
+
+  const expandFoldersForPath = (fileOrFolderPath: string, isRequestPath: boolean) => {
+    const parts = fileOrFolderPath.split('/').filter(Boolean)
+    const folderParts = isRequestPath ? parts.slice(0, -1) : parts
+    if (folderParts.length === 0) return
+
+    const foldersToExpand: string[] = []
+    for (let i = 0; i < folderParts.length; i += 1) {
+      foldersToExpand.push(folderParts.slice(0, i + 1).join('/'))
+    }
+
+    setExpandedFolders(prev => {
+      const next = new Set(prev)
+      for (const folderPath of foldersToExpand) {
+        next.add(folderPath)
+      }
+      return next
+    })
+  }
+
+  const handleSubmitCreateNode = async () => {
+    const nodeName = newNodeName.trim()
+    const { collectionName, parentPath, kind } = createNodeDialog
+    if (!collectionName || !nodeName) return
+
+    try {
+      const result =
+        kind === 'folder'
+          ? await apiService.createFolder(collectionName, parentPath ?? undefined, nodeName)
+          : await apiService.createRequest(collectionName, parentPath ?? undefined, nodeName)
+
+      const collection = collections.find(c => c.name === collectionName)
+      if (collection) {
+        setExpandedCollectionId(collection.id)
+        if (!activeCollection || activeCollection.name !== collectionName) {
+          setActiveCollection(collection)
+        }
+      }
+
+      expandFoldersForPath(result.path, kind === 'request')
+      await fetchCollectionTree(collectionName)
+
+      if (kind === 'request') {
+        await loadRequestFromPath(collectionName, result.path)
+      }
+
+      setCreateNodeDialog({
+        isOpen: false,
+        kind: 'folder',
+        collectionName: null,
+        parentPath: null,
+      })
+      setNewNodeName('')
+    } catch (error) {
+      console.error(`Failed to create ${kind}:`, error)
+      setAlertDialog({
+        isOpen: true,
+        title: `Create ${kind === 'folder' ? 'Folder' : 'Request'} Failed`,
+        description:
+          error instanceof Error ? error.message : `Unable to create ${kind}. Please try again.`,
+        onConfirm: () => setAlertDialog(prev => ({ ...prev, isOpen: false })),
+      })
+    }
   }
 
   const handleRenameConfirm = async () => {
@@ -445,31 +535,64 @@ export function CollectionsSidebar() {
       const isExpanded = expandedFolders.has(folderKey)
       return (
         <div key={node.path || node.name}>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setExpandedFolders(prev => {
-                const next = new Set(prev)
-                if (next.has(folderKey)) {
-                  next.delete(folderKey)
-                } else {
-                  next.add(folderKey)
-                }
-                return next
-              })
-            }}
-            className="w-full justify-start gap-1.5 px-2 py-1.5 h-auto hover:bg-accent/50"
-            style={{ paddingLeft: `${paddingLeft}px` }}
-          >
-            {isExpanded ? (
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            )}
-            <Folder className="h-4 w-4 text-orange-500 shrink-0" />
-            <span className="truncate text-left text-xs font-medium">{node.name}</span>
-          </Button>
+          <div className="flex items-center group hover:bg-accent/50 transition-colors">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setExpandedFolders(prev => {
+                  const next = new Set(prev)
+                  if (next.has(folderKey)) {
+                    next.delete(folderKey)
+                  } else {
+                    next.add(folderKey)
+                  }
+                  return next
+                })
+              }}
+              className="flex-1 justify-start gap-1.5 px-2 py-1.5 h-auto hover:bg-transparent"
+              style={{ paddingLeft: `${paddingLeft}px` }}
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              )}
+              <Folder className="h-4 w-4 text-orange-500 shrink-0" />
+              <span className="truncate text-left text-xs font-medium">{node.name}</span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded hover:bg-accent shrink-0 mr-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!activeCollection) return
+                    openCreateNodeDialog('folder', activeCollection.name, node.path ?? null)
+                  }}
+                >
+                  New Folder
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!activeCollection) return
+                    openCreateNodeDialog('request', activeCollection.name, node.path ?? null)
+                  }}
+                >
+                  New Request
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           {isExpanded && node.children && (
             <div>
               {node.children.map(child => renderTreeNode(child, level + 1, activeFilePath))}
@@ -605,6 +728,36 @@ export function CollectionsSidebar() {
 
                     {/* Action icons */}
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pr-1">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-6 w-6"
+                          >
+                            <MoreHorizontal className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openCreateNodeDialog('folder', collection.name, null)
+                            }}
+                          >
+                            New Folder
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openCreateNodeDialog('request', collection.name, null)
+                            }}
+                          >
+                            New Request
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -846,6 +999,82 @@ export function CollectionsSidebar() {
               size="sm"
               onClick={handleSubmitCreate}
               disabled={!newCollectionName.trim()}
+              className="h-8 px-4 text-sm font-medium"
+            >
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Folder/Request Dialog */}
+      <Dialog
+        open={createNodeDialog.isOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateNodeDialog({
+              isOpen: false,
+              kind: 'folder',
+              collectionName: null,
+              parentPath: null,
+            })
+            setNewNodeName('')
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[420px] gap-0 p-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-5 pb-4 space-y-1">
+            <DialogTitle className="text-base font-semibold tracking-tight">
+              {createNodeDialog.kind === 'folder' ? 'Create Folder' : 'Create Request'}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
+              {createNodeDialog.kind === 'folder'
+                ? 'Create a new folder in this collection location.'
+                : 'Create a new request in this collection location.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="px-6 pb-5">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Name
+              </label>
+              <Input
+                placeholder={createNodeDialog.kind === 'folder' ? 'New Folder' : 'New Request'}
+                value={newNodeName}
+                onChange={(e) => setNewNodeName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSubmitCreateNode()
+                  }
+                }}
+                autoFocus
+                className="h-9 text-sm"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="px-6 py-4 border-t bg-muted/40 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setCreateNodeDialog({
+                  isOpen: false,
+                  kind: 'folder',
+                  collectionName: null,
+                  parentPath: null,
+                })
+                setNewNodeName('')
+              }}
+              className="h-8 px-4 text-sm font-normal"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSubmitCreateNode}
+              disabled={!newNodeName.trim()}
               className="h-8 px-4 text-sm font-medium"
             >
               Create

@@ -128,6 +128,8 @@ func main() {
 	api.HandleFunc("/collections", collectionHandler.CreateCollection).Methods("POST", "OPTIONS")
 	api.HandleFunc("/collections/{name}", collectionHandler.GetCollection).Methods("GET", "OPTIONS")
 	api.HandleFunc("/collections/{name}", collectionHandler.DeleteCollection).Methods("DELETE", "OPTIONS")
+	api.HandleFunc("/collections/{name}/folders", collectionHandler.CreateFolder).Methods("POST", "OPTIONS")
+	api.HandleFunc("/collections/{name}/requests/new", collectionHandler.CreateRequest).Methods("POST", "OPTIONS")
 
 	// Request routes
 	api.HandleFunc("/requests", collectionHandler.GetRequest).Methods("GET", "OPTIONS")

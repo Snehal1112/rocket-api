@@ -109,6 +109,31 @@ class ApiService {
     await this.client.delete(`/collections/${name}`)
   }
 
+  async createFolder(
+    collection: string,
+    parentPath: string | undefined,
+    folderName: string
+  ): Promise<{ path: string }> {
+    const response = await this.client.post<ApiResponse<{ path: string }>>(
+      `/collections/${collection}/folders`,
+      { parentPath, folderName }
+    )
+    return response.data.data
+  }
+
+  async createRequest(
+    collection: string,
+    parentPath: string | undefined,
+    requestName: string,
+    method: string = 'GET'
+  ): Promise<{ path: string }> {
+    const response = await this.client.post<ApiResponse<{ path: string }>>(
+      `/collections/${collection}/requests/new`,
+      { parentPath, requestName, method }
+    )
+    return response.data.data
+  }
+
   // Requests
   async getRequest(collection: string, path: string): Promise<unknown> {
     const response = await this.client.get<ApiResponse<unknown>>('/requests', {
