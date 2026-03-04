@@ -27,8 +27,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
+  Database,
   Folder,
-  FolderOpen,
   Plus,
   ChevronRight,
   ChevronDown,
@@ -714,11 +714,7 @@ export function CollectionsSidebar() {
                         )}
                       </span>
                       <span className="flex items-center gap-1.5 flex-1 min-w-0">
-                        {isExpanded ? (
-                          <FolderOpen className="h-4 w-4 text-orange-500 shrink-0" />
-                        ) : (
-                          <Folder className="h-4 w-4 text-orange-500 shrink-0" />
-                        )}
+                        <Database className="h-4 w-4 text-blue-600 shrink-0" />
                         <span className="truncate text-xs font-medium">{collection.name}</span>
                         <span className="text-[10px] text-muted-foreground shrink-0">
                           ({collection.requestCount})
