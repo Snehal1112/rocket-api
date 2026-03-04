@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { CollectionVar, Environment } from '@/types'
@@ -81,18 +81,77 @@ export function VariableAwareUrlInput({
   const [editingVarName, setEditingVarName] = useState<string | null>(null)
   const [editingValue, setEditingValue] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const closeTimerRef = useRef<number | null>(null)
+  const hoveredTokenRef = useRef<string | null>(null)
+  const isContentHoveredRef = useRef(false)
+  const suppressedReopenTokenRef = useRef<string | null>(null)
+  const editingVarNameRef = useRef<string | null>(null)
 
   const tokenByName = useMemo(() => new Map(tokens.map(t => [t.name, t])), [tokens])
 
+  const clearCloseTimer = () => {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+  }
+
   const openEditor = (token: UrlToken) => {
-    setEditingVarName(token.name)
-    setEditingValue(token.value)
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+    if (suppressedReopenTokenRef.current === token.name) {
+      return
+    }
+    if (editingVarName !== token.name) {
+      setEditingVarName(token.name)
+      setEditingValue(token.value)
+    }
+  }
+
+  const scheduleClose = () => {
+    clearCloseTimer()
+    closeTimerRef.current = window.setTimeout(() => {
+      if (hoveredTokenRef.current || isContentHoveredRef.current) {
+        return
+      }
+      if (editingVarNameRef.current) {
+        suppressedReopenTokenRef.current = editingVarNameRef.current
+      }
+      closeEditor()
+    }, 220)
   }
 
   const closeEditor = () => {
     setEditingVarName(null)
     setEditingValue('')
     setIsSaving(false)
+  }
+
+  useEffect(() => {
+    editingVarNameRef.current = editingVarName
+  }, [editingVarName])
+
+  useEffect(() => {
+    return () => {
+      clearCloseTimer()
+    }
+  }, [])
+
+  const handleTokenPointerEnter = (token: UrlToken) => {
+    hoveredTokenRef.current = token.name
+    openEditor(token)
+  }
+
+  const handleTokenPointerLeave = (tokenName: string) => {
+    if (hoveredTokenRef.current === tokenName) {
+      hoveredTokenRef.current = null
+    }
+    if (suppressedReopenTokenRef.current === tokenName) {
+      suppressedReopenTokenRef.current = null
+    }
+    scheduleClose()
   }
 
   const handleSave = async () => {
@@ -146,15 +205,16 @@ export function VariableAwareUrlInput({
         <DropdownMenu
           key={`token-${idx}`}
           open={editingVarName === (token?.name ?? null)}
-          onOpenChange={(open) => {
-            if (!open && editingVarName === (token?.name ?? null)) {
-              closeEditor()
-            }
-          }}
+          modal={false}
         >
           <DropdownMenuTrigger asChild>
             <span
-              onMouseEnter={() => token && openEditor(token)}
+              onPointerEnter={() => token && handleTokenPointerEnter(token)}
+              onPointerLeave={() => {
+                const tokenName = token?.name
+                if (!tokenName) return
+                handleTokenPointerLeave(tokenName)
+              }}
               onFocus={() => token && openEditor(token)}
               className={`pointer-events-auto rounded px-0.5 border cursor-pointer ${tokenBadgeClass(source)}`}
               title={source === 'missing' ? 'Missing variable' : 'Edit variable value'}
@@ -166,7 +226,14 @@ export function VariableAwareUrlInput({
           <DropdownMenuContent
             align="start"
             className="w-72 p-3 space-y-2"
-            onMouseEnter={() => token && openEditor(token)}
+            onMouseEnter={() => {
+              isContentHoveredRef.current = true
+              clearCloseTimer()
+            }}
+            onMouseLeave={() => {
+              isContentHoveredRef.current = false
+              scheduleClose()
+            }}
           >
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium">{`{{${token?.name ?? part.name ?? ''}}}`}</span>
