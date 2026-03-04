@@ -302,6 +302,18 @@ export const useTabsStore = create<TabsState>((set, get) => {
       const { tabs } = get()
       let { activeTabId } = get()
 
+      // If this request is already open, just focus that tab.
+      const existingTab = tabs.find(
+        t =>
+          t.kind === 'request' &&
+          t.collectionName === collectionName &&
+          t.filePath === path
+      )
+      if (existingTab && existingTab.kind === 'request') {
+        set({ activeTabId: existingTab.id })
+        return
+      }
+
       // If the active tab is a collection overview, open a new request tab instead.
       if (!tabs.find(t => t.id === activeTabId && t.kind === 'request')) {
         const tab = createTab()
