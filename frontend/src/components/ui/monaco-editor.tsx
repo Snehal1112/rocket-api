@@ -36,7 +36,41 @@ export function MonacoEditor({
     setMounted(true)
   }, [])
 
-  const editorTheme = resolvedTheme === 'dark' ? 'vs-dark' : 'vs-light'
+  const defineThemes = (monaco: typeof import('monaco-editor')) => {
+    monaco.editor.defineTheme('rocket-light', {
+      base: 'vs',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editor.background': '#F7FAFC',
+        'editor.foreground': '#111827',
+        'editorLineNumber.foreground': '#64748B',
+        'editorLineNumber.activeForeground': '#1E293B',
+        'editorCursor.foreground': '#0D63CA',
+        'editor.selectionBackground': '#BFDBFE',
+        'editor.inactiveSelectionBackground': '#DBEAFE',
+        'editor.lineHighlightBackground': '#EEF4FF',
+      },
+    })
+
+    monaco.editor.defineTheme('rocket-dark', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editor.background': '#141C2E',
+        'editor.foreground': '#DDE7FB',
+        'editorLineNumber.foreground': '#7D8BA8',
+        'editorLineNumber.activeForeground': '#C2D4FF',
+        'editorCursor.foreground': '#5DA2FF',
+        'editor.selectionBackground': '#1E4F91',
+        'editor.inactiveSelectionBackground': '#1B335D',
+        'editor.lineHighlightBackground': '#1B273F',
+      },
+    })
+  }
+
+  const editorTheme = resolvedTheme === 'dark' ? 'rocket-dark' : 'rocket-light'
 
   if (!mounted) {
     return (
@@ -56,6 +90,7 @@ export function MonacoEditor({
         language={language}
         value={value}
         theme={editorTheme}
+        beforeMount={defineThemes}
         onChange={(newValue) => onChange(newValue || '')}
         options={{
           minimap: { enabled: false },
