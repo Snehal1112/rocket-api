@@ -11,7 +11,8 @@ interface CollectionsState {
   collectionVariables: CollectionVar[]
   fetchCollectionVariables: (name: string) => Promise<void>
   saveCollectionVariables: (name: string, vars: CollectionVar[]) => Promise<void>
-  isLoading: boolean
+  isCollectionsLoading: boolean
+  isCollectionTreeLoading: boolean
   error: string | null
   
   // Actions
@@ -43,64 +44,65 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
   activeCollection: null,
   activeEnvironment: null,
   collectionVariables: [],
-  isLoading: false,
+  isCollectionsLoading: false,
+  isCollectionTreeLoading: false,
   error: null,
   
   fetchCollections: async () => {
-    set({ isLoading: true, error: null })
+    set({ isCollectionsLoading: true, error: null })
     try {
       const collections = await apiService.getCollections()
-      set({ collections, isLoading: false })
+      set({ collections, isCollectionsLoading: false })
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch collections',
-        isLoading: false 
+        isCollectionsLoading: false 
       })
     }
   },
   
   fetchCollectionTree: async (name: string) => {
-    set({ isLoading: true, error: null })
+    set({ isCollectionTreeLoading: true, error: null })
     try {
       const tree = await apiService.getCollection(name)
-      set({ collectionTree: tree, isLoading: false })
+      set({ collectionTree: tree, isCollectionTreeLoading: false })
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch collection tree',
-        isLoading: false 
+        isCollectionTreeLoading: false 
       })
     }
   },
   
   createCollection: async (name: string) => {
-    set({ isLoading: true, error: null })
+    set({ isCollectionsLoading: true, error: null })
     try {
       const collection = await apiService.createCollection(name)
       set((state) => ({ 
         collections: [...state.collections, collection],
-        isLoading: false 
+        isCollectionsLoading: false 
       }))
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to create collection',
-        isLoading: false 
+        isCollectionsLoading: false 
       })
     }
   },
   
   deleteCollection: async (name: string) => {
-    set({ isLoading: true, error: null })
+    set({ isCollectionsLoading: true, error: null })
     try {
       await apiService.deleteCollection(name)
       set((state) => ({ 
         collections: state.collections.filter(c => c.name !== name),
         activeCollection: state.activeCollection?.name === name ? null : state.activeCollection,
-        isLoading: false 
+        isCollectionsLoading: false 
       }))
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to delete collection',
-        isLoading: false 
+        isCollectionsLoading: false 
       })
     }
   },
@@ -191,33 +193,33 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
   },
 
   importBruno: async (file: File, name?: string) => {
-    set({ isLoading: true, error: null })
+    set({ isCollectionsLoading: true, error: null })
     try {
       const collection = await apiService.importBruno(file, name)
       set((state) => ({ 
         collections: [...state.collections, collection],
-        isLoading: false 
+        isCollectionsLoading: false 
       }))
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to import collection',
-        isLoading: false 
+        isCollectionsLoading: false 
       })
     }
   },
   
   importPostman: async (collection: unknown) => {
-    set({ isLoading: true, error: null })
+    set({ isCollectionsLoading: true, error: null })
     try {
       const imported = await apiService.importPostman(collection)
       set((state) => ({ 
         collections: [...state.collections, imported],
-        isLoading: false 
+        isCollectionsLoading: false 
       }))
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to import collection',
-        isLoading: false 
+        isCollectionsLoading: false 
       })
     }
   },

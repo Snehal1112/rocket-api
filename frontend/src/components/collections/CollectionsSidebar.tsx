@@ -113,7 +113,8 @@ export function CollectionsSidebar() {
     collections, 
     collectionTree,
     activeCollection, 
-    isLoading,
+    isCollectionsLoading,
+    isCollectionTreeLoading,
     error,
     fetchCollections,
     fetchCollectionTree,
@@ -679,7 +680,7 @@ export function CollectionsSidebar() {
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        {isLoading ? (
+        {isCollectionsLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
@@ -719,6 +720,9 @@ export function CollectionsSidebar() {
                         <span className="text-[10px] text-muted-foreground shrink-0">
                           ({collection.requestCount})
                         </span>
+                        {isActive && isCollectionTreeLoading && (
+                          <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin shrink-0" />
+                        )}
                       </span>
                     </button>
 
@@ -793,7 +797,7 @@ export function CollectionsSidebar() {
               )
             })}
             
-            {filteredCollections.length === 0 && !isLoading && (
+            {filteredCollections.length === 0 && !isCollectionsLoading && (
               <div className="px-3 py-8 text-center">
                 <p className="text-xs text-muted-foreground mb-3">No collections found</p>
                 <Button 
