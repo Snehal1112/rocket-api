@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -119,7 +119,7 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
   const [auth, setAuth] = useState<AuthConfig>({ type: 'none' })
   
   // Sync local state when the active tab or its request changes from an external source.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (currentRequest) {
       setName(currentRequest.name)
       setMethod(currentRequest.method)

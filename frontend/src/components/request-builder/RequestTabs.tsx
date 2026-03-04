@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTabsStore, isRequestTab } from '@/store/tabs-store'
+import { useCollectionsStore } from '@/store/collections'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -16,7 +17,22 @@ import { METHOD_TEXT_COLORS } from '@/lib/constants'
 
 export function RequestTabs() {
   const { tabs, activeTabId, newTab, closeTab, setActiveTab } = useTabsStore()
+  const { collections, activeCollection, setActiveCollection, fetchCollectionTree } =
+    useCollectionsStore()
   const [closeCandidate, setCloseCandidate] = useState<string | null>(null)
+
+  const handleActivateTab = (tabId: string) => {
+    setActiveTab(tabId)
+    const tab = tabs.find(t => t.id === tabId)
+    if (!tab || !isRequestTab(tab) || !tab.collectionName) return
+    if (activeCollection?.name === tab.collectionName) return
+
+    const collection = collections.find(c => c.name === tab.collectionName)
+    if (!collection) return
+
+    setActiveCollection(collection)
+    fetchCollectionTree(collection.name)
+  }
 
   const handleClose = (e: React.MouseEvent, tabId: string) => {
     e.stopPropagation()
@@ -51,11 +67,11 @@ export function RequestTabs() {
             role="tab"
             tabIndex={0}
             aria-selected={tab.id === activeTabId}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleActivateTab(tab.id)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
-                setActiveTab(tab.id)
+                handleActivateTab(tab.id)
               }
             }}
             className={`group flex items-center gap-1.5 px-3 py-2 text-xs border-r border-border cursor-pointer shrink-0 min-w-0 max-w-[180px] transition-colors ${

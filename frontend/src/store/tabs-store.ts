@@ -16,6 +16,7 @@ export interface RequestTab {
   response: HttpResponse | null
   isDirty: boolean
   isLoading: boolean
+  lastSavedSnapshot?: string
   collectionName?: string
   filePath?: string
 }
@@ -74,17 +75,53 @@ const createDefaultRequest = (): HttpRequest => ({
   auth: { type: 'none' },
 })
 
-const createTab = (request?: HttpRequest): RequestTab => ({
-  kind: 'request',
-  id: crypto.randomUUID(),
-  request: request ?? createDefaultRequest(),
-  response: null,
-  isDirty: false,
-  isLoading: false,
-})
+const serializePersistedRequest = (request: HttpRequest): string =>
+  JSON.stringify({
+    name: request.name,
+    method: request.method,
+    url: request.url,
+    headers: request.headers,
+    queryParams: request.queryParams,
+    body: request.body,
+    auth: request.auth,
+  })
+
+const createTab = (request?: HttpRequest): RequestTab => {
+  const req = request ?? createDefaultRequest()
+  return {
+    kind: 'request',
+    id: crypto.randomUUID(),
+    request: req,
+    response: null,
+    isDirty: false,
+    isLoading: false,
+    lastSavedSnapshot: serializePersistedRequest(req),
+  }
+}
 
 export const useTabsStore = create<TabsState>((set, get) => {
   const initialTab = createTab()
+  const updateActiveRequest = (updater: (request: HttpRequest) => HttpRequest) =>
+    set(state => ({
+      tabs: state.tabs.map(t => {
+        if (t.id !== state.activeTabId || t.kind !== 'request') return t
+
+        const nextRequest = updater(t.request)
+        const previousSnapshot = serializePersistedRequest(t.request)
+        const nextSnapshot = serializePersistedRequest(nextRequest)
+
+        if (nextSnapshot === previousSnapshot) {
+          return t
+        }
+
+        const baseline = t.lastSavedSnapshot ?? previousSnapshot
+        return {
+          ...t,
+          request: nextRequest,
+          isDirty: nextSnapshot !== baseline,
+        }
+      }),
+    }))
 
   return {
     tabs: [initialTab],
@@ -137,67 +174,25 @@ export const useTabsStore = create<TabsState>((set, get) => {
     },
 
     updateActiveName: (name) =>
-      set(state => ({
-        tabs: state.tabs.map(t =>
-          t.id === state.activeTabId && t.kind === 'request'
-            ? { ...t, request: { ...t.request, name }, isDirty: true }
-            : t
-        ),
-      })),
+      updateActiveRequest(request => ({ ...request, name })),
 
     updateActiveMethod: (method) =>
-      set(state => ({
-        tabs: state.tabs.map(t =>
-          t.id === state.activeTabId && t.kind === 'request'
-            ? { ...t, request: { ...t.request, method }, isDirty: true }
-            : t
-        ),
-      })),
+      updateActiveRequest(request => ({ ...request, method })),
 
     updateActiveUrl: (url) =>
-      set(state => ({
-        tabs: state.tabs.map(t =>
-          t.id === state.activeTabId && t.kind === 'request'
-            ? { ...t, request: { ...t.request, url }, isDirty: true }
-            : t
-        ),
-      })),
+      updateActiveRequest(request => ({ ...request, url })),
 
     updateActiveHeaders: (headers) =>
-      set(state => ({
-        tabs: state.tabs.map(t =>
-          t.id === state.activeTabId && t.kind === 'request'
-            ? { ...t, request: { ...t.request, headers }, isDirty: true }
-            : t
-        ),
-      })),
+      updateActiveRequest(request => ({ ...request, headers })),
 
     updateActiveQueryParams: (queryParams) =>
-      set(state => ({
-        tabs: state.tabs.map(t =>
-          t.id === state.activeTabId && t.kind === 'request'
-            ? { ...t, request: { ...t.request, queryParams }, isDirty: true }
-            : t
-        ),
-      })),
+      updateActiveRequest(request => ({ ...request, queryParams })),
 
     updateActiveBody: (body) =>
-      set(state => ({
-        tabs: state.tabs.map(t =>
-          t.id === state.activeTabId && t.kind === 'request'
-            ? { ...t, request: { ...t.request, body }, isDirty: true }
-            : t
-        ),
-      })),
+      updateActiveRequest(request => ({ ...request, body })),
 
     updateActiveAuth: (auth) =>
-      set(state => ({
-        tabs: state.tabs.map(t =>
-          t.id === state.activeTabId && t.kind === 'request'
-            ? { ...t, request: { ...t.request, auth }, isDirty: true }
-            : t
-        ),
-      })),
+      updateActiveRequest(request => ({ ...request, auth })),
 
     loadRequestInActiveTab: (request, collectionName?, filePath?) =>
       set(state => ({
@@ -210,6 +205,7 @@ export const useTabsStore = create<TabsState>((set, get) => {
                 request: { ...request, id: crypto.randomUUID() },
                 response: null,
                 isDirty: false,
+                lastSavedSnapshot: serializePersistedRequest(request),
                 collectionName,
                 filePath,
               }
@@ -234,7 +230,13 @@ export const useTabsStore = create<TabsState>((set, get) => {
     markActiveTabSaved: () =>
       set(state => ({
         tabs: state.tabs.map(t =>
-          t.id === state.activeTabId && t.kind === 'request' ? { ...t, isDirty: false } : t
+          t.id === state.activeTabId && t.kind === 'request'
+            ? {
+                ...t,
+                isDirty: false,
+                lastSavedSnapshot: serializePersistedRequest(t.request),
+              }
+            : t
         ),
       })),
 
@@ -275,11 +277,22 @@ export const useTabsStore = create<TabsState>((set, get) => {
 
       const { apiService } = await import('@/lib/api')
       const effectivePath = path ?? activeTab.filePath
+      const savedSnapshot = serializePersistedRequest(req)
       const result = await apiService.saveRequest(collectionName, effectivePath, bruFile)
       set(state => ({
         tabs: state.tabs.map(t =>
           t.id === activeTabId
-            ? { ...t, isDirty: false, filePath: result.path, collectionName }
+            ? (() => {
+                if (t.kind !== 'request') return t
+                const latestSnapshot = serializePersistedRequest(t.request)
+                return {
+                  ...t,
+                  isDirty: latestSnapshot !== savedSnapshot,
+                  lastSavedSnapshot: savedSnapshot,
+                  filePath: result.path,
+                  collectionName,
+                }
+              })()
             : t
         ),
       }))
