@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react'
 import { useCollectionsStore } from '@/store/collections'
 import { useTabsStore } from '@/store/tabs-store'
 import { useHistoryStore } from '@/store/history'
-import { Template, Cookie as CookieType, BruFile } from '@/types'
+import { BruFile } from '@/types'
 import { apiService } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Dialog,
@@ -38,8 +37,6 @@ import {
   Download,
   Trash2,
   Loader2,
-  LayoutTemplate,
-  Cookie,
   MoreHorizontal,
 } from 'lucide-react'
 import {
@@ -76,16 +73,6 @@ export function CollectionsSidebar() {
     parentPath: null,
   })
   const [newNodeName, setNewNodeName] = useState('')
-  const [isTemplatesDialogOpen, setIsTemplatesDialogOpen] = useState(false)
-  const [templates, setTemplates] = useState<Template[]>([])
-  const [templateCategories, setTemplateCategories] = useState<string[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<string>('')
-  
-  // Cookie state
-  const [isCookiesDialogOpen, setIsCookiesDialogOpen] = useState(false)
-  const [cookies, setCookies] = useState<CookieType[]>([])
-  const [cookieDomains, setCookieDomains] = useState<string[]>([])
-  const [selectedCookieDomain, setSelectedCookieDomain] = useState<string>('')
   
   // Alert dialog state
   const [alertDialog, setAlertDialog] = useState<{
@@ -352,91 +339,6 @@ export function CollectionsSidebar() {
 
   const handleExportBruno = async (name: string) => {
     await exportBruno(name)
-  }
-
-  const loadTemplates = async () => {
-    try {
-      const [templatesData, categories] = await Promise.all([
-        apiService.getTemplates(selectedCategory || undefined),
-        apiService.getTemplateCategories()
-      ])
-      setTemplates(templatesData)
-      setTemplateCategories(categories)
-    } catch (error) {
-      console.error('Failed to load templates:', error)
-    }
-  }
-
-  const handleUseTemplate = (template: Template) => {
-    // Load the template into the active tab.
-    loadRequestInActiveTab({
-      id: template.id,
-      name: template.name,
-      method: template.method,
-      url: template.url,
-      headers: Object.entries(template.headers || {}).map(([key, value]) => ({
-        key,
-        value,
-        enabled: true
-      })),
-      body: {
-        type: template.bodyType as 'none' | 'json' | 'raw' | 'form-data' | 'binary',
-        content: template.body || ''
-      },
-      queryParams: [],
-      auth: { type: 'none' }
-    })
-    setIsTemplatesDialogOpen(false)
-  }
-
-  const loadCookies = async () => {
-    try {
-      const [cookiesData, domains] = await Promise.all([
-        apiService.getCookies(selectedCookieDomain || undefined),
-        apiService.getCookieDomains()
-      ])
-      setCookies(cookiesData)
-      setCookieDomains(domains)
-    } catch (error) {
-      console.error('Failed to load cookies:', error)
-    }
-  }
-
-  const handleDeleteCookie = async (id: string) => {
-    try {
-      await apiService.deleteCookie(id)
-      loadCookies()
-    } catch (error) {
-      console.error('Failed to delete cookie:', error)
-    }
-  }
-
-  const handleClearCookies = () => {
-    setAlertDialog({
-      isOpen: true,
-      title: 'Clear All Cookies',
-      description: 'Are you sure you want to clear all cookies from the cookie jar?',
-      onConfirm: async () => {
-        try {
-          await apiService.clearCookies()
-          loadCookies()
-        } catch (error) {
-          console.error('Failed to clear cookies:', error)
-        }
-        setAlertDialog(prev => ({ ...prev, isOpen: false }))
-      }
-    })
-  }
-
-  const handleClearExpired = async () => {
-    try {
-      const count = await apiService.clearExpiredCookies()
-      // Use a toast or notification instead of alert
-      console.log(`Cleared ${count} expired cookies`)
-      loadCookies()
-    } catch (error) {
-      console.error('Failed to clear expired cookies:', error)
-    }
   }
 
   const getMethodColor = (method?: string) => {
@@ -913,53 +815,6 @@ export function CollectionsSidebar() {
         )}
       </div>
 
-      {/* Sidebar Footer */}
-      <div className="border-t border-border/70 p-2 space-y-1 bg-card/90">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="w-full justify-start text-xs h-7"
-          onClick={handleCreateCollection}
-        >
-          <Plus className="h-3.5 w-3.5 mr-2" />
-          New Collection
-        </Button>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="w-full justify-start text-xs h-7"
-          onClick={handleImportBruno}
-        >
-          <Upload className="h-3.5 w-3.5 mr-2" />
-          Import Collection
-        </Button>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="w-full justify-start text-xs h-7"
-          onClick={() => {
-            setIsTemplatesDialogOpen(true)
-            loadTemplates()
-          }}
-        >
-          <LayoutTemplate className="h-3.5 w-3.5 mr-2" />
-          Templates
-        </Button>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="w-full justify-start text-xs h-7"
-          onClick={() => {
-            setIsCookiesDialogOpen(true)
-            loadCookies()
-          }}
-        >
-          <Cookie className="h-3.5 w-3.5 mr-2" />
-          Cookies ({cookies.length})
-        </Button>
-      </div>
-      <Separator />
-
       {/* Create Collection Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="sm:max-w-[420px] gap-0 p-0 overflow-hidden">
@@ -1084,217 +939,6 @@ export function CollectionsSidebar() {
               className="h-8 px-4 text-sm font-medium"
             >
               Create
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Templates Dialog */}
-      <Dialog open={isTemplatesDialogOpen} onOpenChange={setIsTemplatesDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] gap-0 p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-5 pb-4 space-y-1">
-            <DialogTitle className="text-base font-semibold tracking-tight">
-              Request Templates
-            </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
-              Choose a template to quickly start your request
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="px-6 pb-5">
-            {/* Category Filter */}
-            {templateCategories.length > 0 && (
-              <div className="flex gap-2 mb-4 flex-wrap">
-                <Button
-                  variant={selectedCategory === '' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => { setSelectedCategory(''); loadTemplates() }}
-                  className="text-xs h-7"
-                >
-                  All
-                </Button>
-                {templateCategories.map(cat => (
-                  <Button
-                    key={cat}
-                    variant={selectedCategory === cat ? 'secondary' : 'ghost'}
-                    size="sm"
-                    onClick={() => { setSelectedCategory(cat); loadTemplates() }}
-                    className="text-xs h-7"
-                  >
-                    {cat}
-                  </Button>
-                ))}
-              </div>
-            )}
-            
-            {/* Templates List */}
-            <div className="space-y-2 max-h-[400px] overflow-y-auto">
-              {templates.map(template => (
-                <div
-                  key={template.id}
-                  className="p-3 border rounded-lg hover:bg-accent/50 cursor-pointer transition-colors"
-                  onClick={() => handleUseTemplate(template)}
-                >
-                  <div className="flex items-start gap-3">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                      template.method === 'GET' ? 'bg-blue-100 text-blue-700' :
-                      template.method === 'POST' ? 'bg-green-100 text-green-700' :
-                      template.method === 'PUT' ? 'bg-yellow-100 text-yellow-700' :
-                      template.method === 'DELETE' ? 'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {template.method}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm">{template.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {template.description}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1 truncate font-mono">
-                        {template.url}
-                      </div>
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 bg-muted rounded-full text-muted-foreground">
-                      {template.category}
-                    </span>
-                  </div>
-                </div>
-              ))}
-              {templates.length === 0 && (
-                <div className="text-center text-muted-foreground py-8 text-sm">
-                  No templates found
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <DialogFooter className="px-6 py-4 border-t bg-muted/40 gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsTemplatesDialogOpen(false)}
-              className="h-8 px-4 text-sm font-normal"
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Cookies Dialog */}
-      <Dialog open={isCookiesDialogOpen} onOpenChange={setIsCookiesDialogOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[80vh] gap-0 p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-5 pb-4 space-y-1">
-            <DialogTitle className="text-base font-semibold tracking-tight">
-              Cookie Jar
-            </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
-              Manage cookies for your API requests
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="px-6 pb-5">
-            {/* Domain Filter */}
-            {cookieDomains.length > 0 && (
-              <div className="flex gap-2 mb-4 flex-wrap">
-                <Button
-                  variant={selectedCookieDomain === '' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  onClick={() => { setSelectedCookieDomain(''); loadCookies() }}
-                  className="text-xs h-7"
-                >
-                  All Domains
-                </Button>
-                {cookieDomains.map(domain => (
-                  <Button
-                    key={domain}
-                    variant={selectedCookieDomain === domain ? 'secondary' : 'ghost'}
-                    size="sm"
-                    onClick={() => { setSelectedCookieDomain(domain); loadCookies() }}
-                    className="text-xs h-7"
-                  >
-                    {domain}
-                  </Button>
-                ))}
-              </div>
-            )}
-            
-            {/* Cookies Table */}
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="text-left px-3 py-2 font-medium">Name</th>
-                    <th className="text-left px-3 py-2 font-medium">Domain</th>
-                    <th className="text-left px-3 py-2 font-medium">Path</th>
-                    <th className="text-left px-3 py-2 font-medium">Expires</th>
-                    <th className="text-left px-3 py-2 font-medium">Flags</th>
-                    <th className="text-right px-3 py-2 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cookies.map(cookie => (
-                    <tr key={cookie.id} className="border-t hover:bg-accent/30">
-                      <td className="px-3 py-2 font-mono text-xs">{cookie.name}</td>
-                      <td className="px-3 py-2 text-xs">{cookie.domain}</td>
-                      <td className="px-3 py-2 text-xs">{cookie.path}</td>
-                      <td className="px-3 py-2 text-xs">
-                        {cookie.expires ? new Date(cookie.expires).toLocaleDateString() : 'Session'}
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        <div className="flex gap-1">
-                          {cookie.secure && <span className="text-[10px] px-1 bg-yellow-100 text-yellow-700 rounded">Secure</span>}
-                          {cookie.httpOnly && <span className="text-[10px] px-1 bg-blue-100 text-blue-700 rounded">HttpOnly</span>}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteCookie(cookie.id)}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                  {cookies.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground text-sm">
-                        No cookies in jar
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          
-          <DialogFooter className="px-6 py-4 border-t bg-muted/40 gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleClearExpired}
-              className="h-8 px-4 text-sm font-normal"
-            >
-              Clear Expired
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleClearCookies}
-              className="h-8 px-4 text-sm font-normal"
-            >
-              Clear All
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsCookiesDialogOpen(false)}
-              className="h-8 px-4 text-sm font-normal"
-            >
-              Close
             </Button>
           </DialogFooter>
         </DialogContent>

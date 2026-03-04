@@ -3,6 +3,7 @@ import { RequestBuilder } from '@/components/request-builder/RequestBuilder'
 import { RequestTabs } from '@/components/request-builder/RequestTabs'
 import { CollectionsSidebar } from '@/components/collections/CollectionsSidebar'
 import { CollectionOverview } from '@/components/collections/CollectionOverview'
+import { GlobalStatusBar } from '@/components/layout/GlobalStatusBar'
 import { ThemeProvider, useTheme } from 'next-themes'
 import { useState, useEffect } from 'react'
 import { useWebSocket } from '@/hooks/use-websocket'
@@ -108,6 +109,7 @@ function App() {
               )}
             </main>
           </div>
+          <GlobalStatusBar />
         </div>
       </ThemeProvider>
     </QueryClientProvider>
