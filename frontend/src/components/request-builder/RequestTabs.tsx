@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Plus, X, FolderOpen } from 'lucide-react'
+import { Plus, X, Database } from 'lucide-react'
 import { METHOD_TEXT_COLORS } from '@/lib/constants'
 
 export function RequestTabs() {
@@ -99,7 +99,7 @@ export function RequestTabs() {
               </>
             ) : (
               <>
-                <FolderOpen className="h-3.5 w-3.5 shrink-0 text-orange-500" />
+                <Database className="h-3.5 w-3.5 shrink-0 text-blue-600" />
                 <span className="truncate">{tab.collectionName}</span>
               </>
             )}
