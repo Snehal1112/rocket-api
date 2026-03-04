@@ -129,7 +129,7 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
       setBody(currentRequest.body)
       setAuth(currentRequest.auth)
     }
-  }, [currentRequest?.id, activeTabId]) // Re-sync on request ID change or tab switch
+  }, [currentRequest, activeTabId]) // Re-sync on request change or tab switch
 
   const handleSaveRequest = useCallback(async () => {
     if (!activeCollection) {
@@ -154,27 +154,6 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
     // Refresh the sidebar tree so the saved request appears immediately.
     useCollectionsStore.getState().fetchCollectionTree(activeCollection.name)
   }, [activeCollection, name, method, url, headers, queryParams, body, auth, updateActiveName, updateActiveMethod, updateActiveUrl, updateActiveHeaders, updateActiveQueryParams, updateActiveBody, updateActiveAuth, saveActiveTab])
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl/Cmd + Enter to send request
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault()
-        if (url.trim()) {
-          handleSubmit()
-        }
-      }
-      // Ctrl/Cmd + S to save request
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault()
-        handleSaveRequest()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [url, method, headers, queryParams, body, auth, activeCollection])
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -280,6 +259,26 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
       setActiveTabLoading(false)
     }
   }, [url, method, headers, queryParams, body, auth, onRequestSent, updateActiveMethod, updateActiveUrl, updateActiveHeaders, updateActiveQueryParams, updateActiveBody, updateActiveAuth, setActiveTabLoading, setActiveTabResponse])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault()
+        if (url.trim()) {
+          handleSubmit()
+        }
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        handleSaveRequest()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [url, handleSubmit, handleSaveRequest])
 
   // Header management
   const addHeader = () => setHeaders([...headers, { key: '', value: '', enabled: true }])

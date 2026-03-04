@@ -31,8 +31,8 @@ export function MonacoEditor({
   const [mounted, setMounted] = useState(false)
 
   // Avoid hydration mismatch - suppressHydrationWarning handles the mismatch
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true)
   }, [])
 

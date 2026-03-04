@@ -97,7 +97,11 @@ export function EnvironmentsDialog({ open, onOpenChange }: EnvironmentsDialogPro
   const toggleRevealSecret = (index: number) => {
     setRevealedSecrets(prev => {
       const next = new Set(prev)
-      next.has(index) ? next.delete(index) : next.add(index)
+      if (next.has(index)) {
+        next.delete(index)
+      } else {
+        next.add(index)
+      }
       return next
     })
   }
