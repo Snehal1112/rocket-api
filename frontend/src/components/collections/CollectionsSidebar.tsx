@@ -441,13 +441,13 @@ export function CollectionsSidebar() {
 
   const getMethodColor = (method?: string) => {
     const colors: Record<string, string> = {
-      GET: 'bg-blue-100 text-blue-700',
-      POST: 'bg-green-100 text-green-700',
-      PUT: 'bg-yellow-100 text-yellow-700',
-      DELETE: 'bg-red-100 text-red-700',
-      PATCH: 'bg-purple-100 text-purple-700',
+      GET: 'text-emerald-600 dark:text-emerald-400',
+      POST: 'text-amber-600 dark:text-amber-400',
+      PUT: 'text-blue-600 dark:text-blue-400',
+      DELETE: 'text-rose-600 dark:text-rose-400',
+      PATCH: 'text-violet-600 dark:text-violet-400',
     }
-    return colors[method?.toUpperCase() || 'GET'] || 'bg-gray-100 text-gray-600'
+    return colors[method?.toUpperCase() || 'GET'] || 'text-muted-foreground'
   }
 
   const filteredCollections = (collections || []).filter(collection => 
@@ -463,70 +463,76 @@ export function CollectionsSidebar() {
       return (
         <div
           key={node.path || node.name}
-          className={`flex items-center group hover:bg-accent/50 transition-colors ${
-            isActiveRequest ? 'border-l-2 border-primary bg-accent/60' : 'border-l-2 border-transparent'
+          className={`group flex items-center border-l-2 transition-colors hover:bg-accent/40 ${
+            isActiveRequest
+              ? 'border-primary bg-accent/55 text-foreground'
+              : 'border-transparent text-foreground/90'
           }`}
-          style={{ paddingLeft: `${paddingLeft + 24}px` }}
+          style={{ paddingLeft: `${paddingLeft + 20}px` }}
         >
           <button
             type="button"
-            className="flex items-center gap-2 flex-1 min-w-0 py-1.5 pr-1 text-left"
+            className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pr-1 text-left"
             onClick={() => {
               if (activeCollection && node.path) {
                 loadRequestFromPath(activeCollection.name, node.path)
               }
             }}
           >
-            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded w-[42px] text-center shrink-0 ${getMethodColor(node.method)}`}>
-              {node.method || 'GET'}
+            <span
+              className={`w-11 shrink-0 text-left text-[10px] font-semibold uppercase tracking-wide ${getMethodColor(node.method)}`}
+            >
+              {(node.method || 'GET').toUpperCase()}
             </span>
-            <span className="truncate text-xs text-foreground">
+            <span className={`truncate text-xs leading-5 ${isActiveRequest ? 'font-medium' : ''}`}>
               {node.name}
             </span>
           </button>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded hover:bg-accent shrink-0 mr-1"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-36">
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setRenameDialog({ isOpen: true, node })
-                  setRenameValue(node.name)
-                }}
-              >
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setAlertDialog({
-                    isOpen: true,
-                    title: 'Delete Request',
-                    description: `Are you sure you want to delete "${node.name}"? This action cannot be undone.`,
-                    onConfirm: async () => {
-                      if (activeCollection && node.path) {
-                        await apiService.deleteRequest(activeCollection.name, node.path)
-                        await fetchCollectionTree(activeCollection.name)
+          <div className="mr-1 flex w-6 shrink-0 justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="h-5 w-5 rounded opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36">
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setRenameDialog({ isOpen: true, node })
+                    setRenameValue(node.name)
+                  }}
+                >
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setAlertDialog({
+                      isOpen: true,
+                      title: 'Delete Request',
+                      description: `Are you sure you want to delete "${node.name}"? This action cannot be undone.`,
+                      onConfirm: async () => {
+                        if (activeCollection && node.path) {
+                          await apiService.deleteRequest(activeCollection.name, node.path)
+                          await fetchCollectionTree(activeCollection.name)
+                        }
+                        setAlertDialog(prev => ({ ...prev, isOpen: false }))
                       }
-                      setAlertDialog(prev => ({ ...prev, isOpen: false }))
-                    }
-                  })
-                }}
-              >
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    })
+                  }}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       )
     }
