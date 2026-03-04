@@ -35,7 +35,7 @@ const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HE
 export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
   const [activeTab, setActiveTab] = useState('params')
   const [responseTab, setResponseTab] = useState('body')
-  const [bodyLanguage, setBodyLanguage] = useState('json')
+  const [bodyLanguage, setBodyLanguage] = useState('plaintext')
   
   // Resizable panel state
   const [requestHeight, setRequestHeight] = useState(50)
@@ -612,7 +612,7 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
                     </SelectContent>
                   </Select>
                   
-                  {body.type === 'json' && (
+                  {body.type === 'raw' && (
                     <Select value={bodyLanguage} onValueChange={setBodyLanguage}>
                       <SelectTrigger className="w-[120px] h-7 text-xs">
                         <SelectValue />
@@ -638,7 +638,7 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
                   <div className="flex-1 border rounded min-h-[200px]">
                     <MonacoEditor
                       height="100%"
-                      language={body.type === 'json' ? 'json' : 'plaintext'}
+                      language={body.type === 'json' ? 'json' : bodyLanguage}
                       value={body.content}
                       onChange={(value) => setBody({ ...body, content: value })}
                     />
