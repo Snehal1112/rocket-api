@@ -1,22 +1,9 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { HttpMethod, HttpRequest, HttpResponse, Header, QueryParam, RequestBody, FormDataField, AuthConfig } from '@/types'
-import { apiService } from '@/lib/api'
-import { mockApiService } from '@/lib/mock-api'
-import { useTabsStore } from '@/store/tabs-store'
-import { useCollectionsStore } from '@/store/collections'
-import { useHistoryStore } from '@/store/history'
-import { substituteRequestVariables } from '@/lib/environment'
-import { METHOD_TEXT_COLORS } from '@/lib/constants'
-import { applyApiKeyToQueryParams } from '@/lib/request-auth'
-import { MonacoEditor } from '@/components/ui/monaco-editor'
-import { Play, Loader2, Plus, Check, X, FileText, Lock, Key, User, Upload, Save, Copy, Settings2, Globe } from 'lucide-react'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { HttpRequest, HttpResponse, QueryParam } from '@/types'
 import { EnvironmentsDialog } from '@/components/collections/EnvironmentsDialog'
-import { VariableAwareUrlInput } from '@/components/request-builder/VariableAwareUrlInput'
+import { RequestBuilderTabs } from '@/components/request-builder/RequestBuilderTabs'
+import { RequestBuilderResponsePanel } from '@/components/request-builder/RequestBuilderResponsePanel'
+import { RequestBuilderToolbar } from '@/components/request-builder/RequestBuilderToolbar'
+import { useRequestBuilderState } from '@/components/request-builder/useRequestBuilderState'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,989 +18,140 @@ interface RequestBuilderProps {
   onRequestSent?: (request: HttpRequest, response: HttpResponse) => void
 }
 
-const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']
-
-
 export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
-  const [activeTab, setActiveTab] = useState('params')
-  const [responseTab, setResponseTab] = useState('body')
-  const [bodyLanguage, setBodyLanguage] = useState('plaintext')
-  
-  // Resizable panel state
-  const [requestHeight, setRequestHeight] = useState(50)
-  const [isDragging, setIsDragging] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  
-  // Alert dialog state
-  const [alertDialog, setAlertDialog] = useState<{
-    isOpen: boolean
-    title: string
-    description: string
-  }>({ isOpen: false, title: '', description: '' })
-  
-  // Handle resize
-  const handleMouseDown = useCallback(() => {
-    setIsDragging(true)
-  }, [])
-  
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false)
-  }, [])
-  
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging || !containerRef.current) return
-    
-    const containerRect = containerRef.current.getBoundingClientRect()
-    const newHeight = ((e.clientY - containerRect.top) / containerRect.height) * 100
-    
-    // Clamp between 20% and 80%
-    setRequestHeight(Math.max(20, Math.min(80, newHeight)))
-  }, [isDragging])
-  
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-    } else {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-    
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isDragging, handleMouseMove, handleMouseUp])
-  
-  // Tabs store
   const {
-    tabs,
-    activeTabId,
+    containerRef,
+    requestHeight,
+    isDragging,
+    handleMouseDown,
+    alertDialog,
+    setAlertDialog,
+    envDialogOpen,
+    setEnvDialogOpen,
+    activeCollection,
+    environments,
+    activeEnvironment,
+    collectionVariables,
+    setActiveEnvironment,
+    name,
+    setName,
+    method,
+    setMethod,
+    url,
+    setUrl,
+    headers,
+    queryParams,
+    setQueryParams,
+    pathParams,
+    setPathParams,
+    body,
+    auth,
+    setBody,
+    setAuth,
+    isDirty,
+    isLoading,
+    response,
+    handleSubmit,
+    handleSaveRequest,
+    handleSaveUrlVariable,
+    addHeader,
+    removeHeader,
+    updateHeader,
+    addQueryParam,
+    removeQueryParam,
+    updateQueryParam,
+    addPathParam,
+    removePathParam,
+    updatePathParam,
+    addFormDataField,
+    removeFormDataField,
+    updateFormDataField,
+    handleFileUpload,
+    handleBinaryUpload,
     updateActiveName,
-    updateActiveMethod,
-    updateActiveUrl,
-    updateActiveHeaders,
-    updateActiveQueryParams,
-    updateActivePathParams,
-    updateActiveBody,
-    updateActiveAuth,
-    setActiveTabResponse,
-    setActiveTabLoading,
-    saveActiveTab,
-  } = useTabsStore()
-
-  const activeTab_ = tabs.find(t => t.id === activeTabId)
-  const currentRequest = activeTab_?.kind === 'request' ? activeTab_.request : undefined
-  const isDirty = activeTab_?.kind === 'request' ? activeTab_.isDirty : false
-  const isLoading = activeTab_?.kind === 'request' ? activeTab_.isLoading : false
-  const response = activeTab_?.kind === 'request' ? activeTab_.response : null
-  
-  // Collections store
-  const { activeCollection, environments, activeEnvironment, collectionVariables, setActiveEnvironment } = useCollectionsStore()
-  const [envDialogOpen, setEnvDialogOpen] = useState(false)
-  
-  // Local state for editing
-  const [name, setName] = useState('Untitled Request')
-  const [method, setMethod] = useState<HttpMethod>('GET')
-  const [url, setUrl] = useState('')
-  const [headers, setHeaders] = useState<Header[]>([])
-  const [queryParams, setQueryParams] = useState<QueryParam[]>([])
-  const [pathParams, setPathParams] = useState<QueryParam[]>([])
-  const [body, setBody] = useState<RequestBody>({ type: 'none', content: '' })
-  const [auth, setAuth] = useState<AuthConfig>({ type: 'none' })
-  
-  // Sync local state when the active tab or its request changes from an external source.
-  useLayoutEffect(() => {
-    if (currentRequest) {
-      setName(currentRequest.name)
-      setMethod(currentRequest.method)
-      setUrl(currentRequest.url)
-      setHeaders(currentRequest.headers)
-      setQueryParams(currentRequest.queryParams)
-      setPathParams(currentRequest.pathParams ?? [])
-      setBody(currentRequest.body)
-      setAuth(currentRequest.auth)
-    }
-  }, [currentRequest, activeTabId]) // Re-sync on request change or tab switch
-
-  const handleSaveRequest = useCallback(async () => {
-    if (!activeCollection) {
-      setAlertDialog({
-        isOpen: true,
-        title: 'No Collection Selected',
-        description: 'Please select a collection first before saving a request.'
-      })
-      return
-    }
-
-    // Flush local edits into the store before saving.
-    updateActiveName(name)
-    updateActiveMethod(method)
-    updateActiveUrl(url)
-    updateActiveHeaders(headers)
-    updateActiveQueryParams(queryParams)
-    updateActivePathParams(pathParams)
-    updateActiveBody(body)
-    updateActiveAuth(auth)
-
-    await saveActiveTab(activeCollection.name)
-    // Refresh the sidebar tree so the saved request appears immediately.
-    useCollectionsStore.getState().fetchCollectionTree(activeCollection.name)
-  }, [activeCollection, name, method, url, headers, queryParams, pathParams, body, auth, updateActiveName, updateActiveMethod, updateActiveUrl, updateActiveHeaders, updateActiveQueryParams, updateActivePathParams, updateActiveBody, updateActiveAuth, saveActiveTab])
-
-  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
-    e?.preventDefault()
-    if (!url.trim()) {
-      return
-    }
-
-    // Flush local edits into the store before sending.
-    updateActiveMethod(method)
-    updateActiveUrl(url)
-    updateActiveHeaders(headers)
-    updateActiveQueryParams(queryParams)
-    updateActivePathParams(pathParams)
-    updateActiveBody(body)
-    updateActiveAuth(auth)
-
-    const applyPathParamsToUrl = (inputUrl: string): string => {
-      let output = inputUrl
-      const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      for (const param of pathParams) {
-        if (!param.enabled || !param.key) continue
-        output = output.replace(new RegExp(`:${escapeRegExp(param.key)}\\b`, 'g'), param.value)
-      }
-      return output
-    }
-
-    // Get active environment and collection variables from collections store.
-    const { activeEnvironment, collectionVariables } = useCollectionsStore.getState()
-
-    // Substitute environment variables and collection variables.
-    const substituted = substituteRequestVariables(
-      applyPathParamsToUrl(url),
-      headers,
-      body.content,
-      activeEnvironment,
-      collectionVariables
-    )
-
-    setActiveTabLoading(true)
-
-    try {
-      // Apply auth to headers.
-      const finalHeaders = [...substituted.headers]
-
-      if (auth.type === 'bearer' && auth.bearer?.token) {
-        finalHeaders.push({
-          key: 'Authorization',
-          value: `Bearer ${auth.bearer.token}`,
-          enabled: true
-        })
-      } else if (auth.type === 'basic' && auth.basic?.username) {
-        const credentials = btoa(`${auth.basic.username}:${auth.basic.password}`)
-        finalHeaders.push({
-          key: 'Authorization',
-          value: `Basic ${credentials}`,
-          enabled: true
-        })
-      } else if (auth.type === 'api-key' && auth.apiKey?.key && auth.apiKey?.value) {
-        if (auth.apiKey.in === 'header') {
-          finalHeaders.push({
-            key: auth.apiKey.key,
-            value: auth.apiKey.value,
-            enabled: true
-          })
-        }
-      }
-
-      const finalQueryParams = applyApiKeyToQueryParams(
-        queryParams.filter(q => q.enabled),
-        auth
-      )
-
-      const request: HttpRequest = {
-        id: Date.now().toString(),
-        name: 'Untitled Request',
-        method,
-        url: substituted.url,
-        headers: finalHeaders.filter(h => h.enabled),
-        body: { ...body, content: substituted.body },
-        queryParams: finalQueryParams,
-        pathParams,
-        auth
-      }
-
-      let httpResponse: HttpResponse
-      let usedMockService = false
-
-      try {
-        httpResponse = await apiService.sendRequest(request)
-      } catch {
-        httpResponse = await mockApiService.sendRequest(request)
-        usedMockService = true
-      }
-
-      // Add mock indicator to response if mock service was used.
-      if (usedMockService) {
-        httpResponse.headers = {
-          ...httpResponse.headers,
-          'X-Rocket-Mock': 'true'
-        }
-      }
-
-      setActiveTabResponse(httpResponse)
-
-      // Refresh history after successful request.
-      const { fetchHistory } = useHistoryStore.getState()
-      fetchHistory()
-
-      if (onRequestSent) onRequestSent(request, httpResponse)
-    } catch (error) {
-      setActiveTabResponse({
-        status: 0,
-        statusText: 'Request Failed',
-        headers: {},
-        body: `Failed to send request.\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        size: 0,
-        time: 0
-      })
-    } finally {
-      setActiveTabLoading(false)
-    }
-  }, [url, method, headers, queryParams, pathParams, body, auth, onRequestSent, updateActiveMethod, updateActiveUrl, updateActiveHeaders, updateActiveQueryParams, updateActivePathParams, updateActiveBody, updateActiveAuth, setActiveTabLoading, setActiveTabResponse])
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault()
-        if (url.trim()) {
-          handleSubmit()
-        }
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault()
-        handleSaveRequest()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [url, handleSubmit, handleSaveRequest])
-
-  // Header management
-  const addHeader = () => setHeaders([...headers, { key: '', value: '', enabled: true }])
-  const removeHeader = (index: number) => setHeaders(headers.filter((_, i) => i !== index))
-  const updateHeader = (index: number, field: 'key' | 'value' | 'enabled', value: string | boolean) => {
-    const newHeaders = headers.map((h, i) =>
-      i === index ? { ...h, [field]: value } : h
-    )
-    setHeaders(newHeaders)
-  }
-
-  // Query param management
-  const addQueryParam = () => setQueryParams([...queryParams, { key: '', value: '', enabled: true }])
-  const removeQueryParam = (index: number) => setQueryParams(queryParams.filter((_, i) => i !== index))
-  const updateQueryParam = (index: number, field: 'key' | 'value' | 'enabled', value: string | boolean) => {
-    const newParams = queryParams.map((p, i) =>
-      i === index ? { ...p, [field]: value } : p
-    )
-    setQueryParams(newParams)
-  }
-  const addPathParam = () => setPathParams([...pathParams, { key: '', value: '', enabled: true }])
-  const removePathParam = (index: number) => setPathParams(pathParams.filter((_, i) => i !== index))
-  const updatePathParam = (index: number, field: 'key' | 'value' | 'enabled', value: string | boolean) => {
-    const newParams = pathParams.map((p, i) =>
-      i === index ? { ...p, [field]: value } : p
-    )
-    setPathParams(newParams)
-  }
-
-  // Form data management
-  const addFormDataField = () => {
-    const newField: FormDataField = { key: '', value: '', type: 'text', enabled: true }
-    setBody({ ...body, formData: [...(body.formData || []), newField] })
-  }
-  
-  const removeFormDataField = (index: number) => {
-    setBody({ ...body, formData: body.formData?.filter((_, i) => i !== index) })
-  }
-  
-  const updateFormDataField = (index: number, field: keyof FormDataField, value: string | boolean) => {
-    const newFields = [...(body.formData || [])]
-    newFields[index] = { ...newFields[index], [field]: value }
-    setBody({ ...body, formData: newFields })
-  }
-
-  // File upload handler
-  const handleFileUpload = (index: number, file: File | null) => {
-    if (!file) return
-    
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const content = e.target?.result as string
-      updateFormDataField(index, 'fileName', file.name)
-      updateFormDataField(index, 'fileContent', content.split(',')[1]) // Remove data URL prefix
-      updateFormDataField(index, 'value', file.name)
-    }
-    reader.readAsDataURL(file)
-  }
-
-  // Binary file upload
-  const handleBinaryUpload = (file: File | null) => {
-    if (!file) return
-    
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const content = e.target?.result as string
-      setBody({
-        type: 'binary',
-        content: content.split(',')[1],
-        fileName: file.name
-      })
-    }
-    reader.readAsDataURL(file)
-  }
-
-  const formatResponseBody = (body: unknown): string => {
-    if (typeof body === 'string') {
-      try {
-        const parsed = JSON.parse(body)
-        return JSON.stringify(parsed, null, 2)
-      } catch {
-        return body
-      }
-    }
-    if (body === null || body === undefined) {
-      return ''
-    }
-    try {
-      return JSON.stringify(body, null, 2)
-    } catch {
-      return String(body)
-    }
-  }
-
-  const handleSaveUrlVariable = useCallback(
-    async (name: string, nextValue: string) => {
-      const { activeCollection, activeEnvironment, environments, collectionVariables } = useCollectionsStore.getState()
-      if (!activeCollection) return
-
-      const envMatch = activeEnvironment?.variables.find(v => v.key === name)
-      if (activeEnvironment && envMatch) {
-        const updatedEnv = {
-          ...activeEnvironment,
-          variables: activeEnvironment.variables.map(v =>
-            v.key === name ? { ...v, value: nextValue, enabled: true } : v
-          ),
-        }
-        await useCollectionsStore.getState().saveEnvironment(activeCollection.name, updatedEnv)
-        const refreshedEnv = environments.find(e => e.name === activeEnvironment.name) ?? updatedEnv
-        useCollectionsStore.getState().setActiveEnvironment(refreshedEnv)
-        return
-      }
-
-      const collectionMatch = collectionVariables.find(v => v.key === name)
-      if (collectionMatch) {
-        const updatedCollectionVars = collectionVariables.map(v =>
-          v.key === name ? { ...v, value: nextValue, enabled: true } : v
-        )
-        await useCollectionsStore.getState().saveCollectionVariables(activeCollection.name, updatedCollectionVars)
-        return
-      }
-
-      if (activeEnvironment) {
-        const updatedEnv = {
-          ...activeEnvironment,
-          variables: [
-            ...activeEnvironment.variables,
-            { key: name, value: nextValue, enabled: true, secret: false },
-          ],
-        }
-        await useCollectionsStore.getState().saveEnvironment(activeCollection.name, updatedEnv)
-        const refreshedEnv = useCollectionsStore
-          .getState()
-          .environments.find(e => e.name === activeEnvironment.name) ?? updatedEnv
-        useCollectionsStore.getState().setActiveEnvironment(refreshedEnv)
-        return
-      }
-
-      await useCollectionsStore
-        .getState()
-        .saveCollectionVariables(activeCollection.name, [
-          ...collectionVariables,
-          { key: name, value: nextValue, enabled: true, secret: false },
-        ])
-    },
-    []
-  )
+  } = useRequestBuilderState({ onRequestSent })
 
   return (
     <div ref={containerRef} className="flex flex-col h-full overflow-hidden bg-transparent">
-      {/* Request Section */}
-      <div 
+      <div
         className="flex flex-col overflow-hidden bg-card/80"
         style={{ height: `${requestHeight}%`, minHeight: '20%', maxHeight: '80%' }}
       >
-        <div className="px-4 pt-3 pb-4 border-b border-border/70 bg-card/80 backdrop-blur-sm space-y-2">
-          <div className="flex items-center gap-2">
-            <Input
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value)
-                updateActiveName(e.target.value)
-              }}
-              placeholder="Untitled Request"
-              className="h-7 text-sm font-medium border-0 border-b border-transparent hover:border-border focus:border-primary rounded-none bg-transparent px-0 focus-visible:ring-0 shadow-none flex-1"
-            />
-            {/* Environment selector */}
-            <div className="flex items-center gap-1 shrink-0">
-              <Select
-                value={activeEnvironment?.name ?? 'none'}
-                onValueChange={(value) => {
-                  if (value === 'none') {
-                    setActiveEnvironment(null)
-                  } else {
-                    const env = environments.find(e => e.name === value) ?? null
-                    setActiveEnvironment(env)
-                  }
-                }}
-                disabled={!activeCollection}
-              >
-                <SelectTrigger className="h-7 text-xs w-[120px] gap-1 border-dashed">
-                  <Globe className="h-3 w-3 text-muted-foreground shrink-0" />
-                  <SelectValue placeholder="No Env" />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  <SelectItem value="none" className="text-xs">No Environment</SelectItem>
-                  {environments.map(env => (
-                    <SelectItem key={env.name} value={env.name} className="text-xs">{env.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => setEnvDialogOpen(true)}
-                title="Manage environments"
-                disabled={!activeCollection}
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-          <TooltipProvider>
-            <form onSubmit={handleSubmit} className="flex gap-3">
-              <Select value={method} onValueChange={(v) => setMethod(v as HttpMethod)}>
-                <SelectTrigger className={`w-[110px] h-9 font-semibold text-sm ${METHOD_TEXT_COLORS[method]}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {HTTP_METHODS.map((m) => (
-                    <SelectItem key={m} value={m} className="text-sm font-medium">
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <div className="flex-1">
-                <VariableAwareUrlInput
-                  value={url}
-                  onChange={setUrl}
-                  placeholder="https://api.example.com/v1/resource"
-                  className="text-sm h-9 font-mono bg-background/90"
-                  activeEnvironment={activeEnvironment}
-                  collectionVariables={collectionVariables}
-                  pathParams={pathParams}
-                  queryParams={queryParams}
-                  onSaveParamToken={async (tokenName, tokenValue, target) => {
-                    const upsert = (prev: QueryParam[]) => {
-                      const idx = prev.findIndex(p => p.key === tokenName)
-                      if (idx >= 0) {
-                        return prev.map((p, i) =>
-                          i === idx ? { ...p, value: tokenValue, enabled: true } : p
-                        )
-                      }
-                      return [...prev, { key: tokenName, value: tokenValue, enabled: true }]
-                    }
-                    if (target === 'path') {
-                      setPathParams(prev => upsert(prev))
-                      return
-                    }
-                    setQueryParams(prev => upsert(prev))
-                  }}
-                  onSaveVariable={async (name, value) => {
-                    try {
-                      await handleSaveUrlVariable(name, value)
-                    } catch (error) {
-                      setAlertDialog({
-                        isOpen: true,
-                        title: 'Variable Update Failed',
-                        description:
-                          error instanceof Error
-                            ? error.message
-                            : 'Unable to update variable value.',
-                      })
-                    }
-                  }}
-                />
-              </div>
-              
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="submit"
-                    disabled={isLoading}
-                    size="sm"
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 font-semibold px-4 rounded-md shadow-sm"
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Play className="h-4 w-4" />
-                    )}
-                    <span className="ml-2">Send</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Send Request (Ctrl+Enter)</p>
-                </TooltipContent>
-              </Tooltip>
-              
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSaveRequest}
-                    disabled={!activeCollection}
-                    className={`font-medium px-3 ${isDirty ? 'border-primary/40 text-primary hover:bg-accent/60' : 'hover:bg-accent/40'}`}
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {isDirty ? 'Save*' : 'Save'}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{isDirty ? 'Save changes (Ctrl+S)' : 'No changes to save'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </form>
-          </TooltipProvider>
-        </div>
+        <RequestBuilderToolbar
+          name={name}
+          setName={setName}
+          method={method}
+          setMethod={setMethod}
+          url={url}
+          setUrl={setUrl}
+          isLoading={isLoading}
+          isDirty={isDirty}
+          activeCollection={activeCollection}
+          activeEnvironment={activeEnvironment}
+          environments={environments}
+          collectionVariables={collectionVariables}
+          pathParams={pathParams}
+          queryParams={queryParams}
+          onRequestNameChange={updateActiveName}
+          onSetActiveEnvironment={setActiveEnvironment}
+          onOpenEnvironmentsDialog={() => setEnvDialogOpen(true)}
+          onSubmit={handleSubmit}
+          onSave={handleSaveRequest}
+          onSaveParamToken={async (tokenName, tokenValue, target) => {
+            const upsert = (prev: QueryParam[]) => {
+              const idx = prev.findIndex(p => p.key === tokenName)
+              if (idx >= 0) {
+                return prev.map((p, i) =>
+                  i === idx ? { ...p, value: tokenValue, enabled: true } : p
+                )
+              }
+              return [...prev, { key: tokenName, value: tokenValue, enabled: true }]
+            }
+            if (target === 'path') {
+              setPathParams(prev => upsert(prev))
+              return
+            }
+            setQueryParams(prev => upsert(prev))
+          }}
+          onSaveVariable={async (variableName, variableValue) => {
+            try {
+              await handleSaveUrlVariable(variableName, variableValue)
+            } catch (error) {
+              setAlertDialog({
+                isOpen: true,
+                title: 'Variable Update Failed',
+                description:
+                  error instanceof Error
+                    ? error.message
+                    : 'Unable to update variable value.',
+              })
+            }
+          }}
+        />
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="w-full justify-start rounded-none border-b border-border/70 bg-card/60 h-9 px-3">
-            <TabsTrigger value="params" className="text-xs rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent">
-              Params {(queryParams.filter(p => p.enabled).length + pathParams.filter(p => p.enabled).length) > 0 && `(${queryParams.filter(p => p.enabled).length + pathParams.filter(p => p.enabled).length})`}
-            </TabsTrigger>
-            <TabsTrigger value="headers" className="text-xs rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent">
-              Headers {headers.filter(h => h.enabled).length > 0 && `(${headers.filter(h => h.enabled).length})`}
-            </TabsTrigger>
-            <TabsTrigger value="body" className="text-xs rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent">
-              Body
-            </TabsTrigger>
-            <TabsTrigger value="auth" className="text-xs rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent">
-              Auth {auth.type !== 'none' && '●'}
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="flex-1 overflow-auto p-3">
-            <TabsContent value="params" className="mt-0 h-full">
-              <div className="space-y-2">
-                <div className="text-[11px] font-medium text-muted-foreground">Path Params</div>
-                {pathParams.map((param, index) => (
-                  <div key={`path-${index}`} className="flex gap-2 items-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => updatePathParam(index, 'enabled', !param.enabled)}
-                      className={`w-4 h-4 rounded border p-0 ${
-                        param.enabled ? 'bg-primary border-primary text-primary-foreground hover:bg-primary/90' : 'border-gray-300 hover:bg-muted'
-                      }`}
-                    >
-                      {param.enabled && <Check className="h-3 w-3" />}
-                    </Button>
-                    <Input
-                      placeholder="Path Key (e.g. customerId)"
-                      value={param.key}
-                      onChange={(e) => updatePathParam(index, 'key', e.target.value)}
-                      className="flex-1 text-xs h-8"
-                    />
-                    <Input
-                      placeholder="Value"
-                      value={param.value}
-                      onChange={(e) => updatePathParam(index, 'value', e.target.value)}
-                      className="flex-1 text-xs h-8"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removePathParam(index)}
-                      className="h-7 w-7"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button variant="ghost" size="sm" onClick={addPathParam} className="text-xs">
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add Path Param
-                </Button>
-
-                <div className="text-[11px] font-medium text-muted-foreground pt-2">Query Params</div>
-                {queryParams.map((param, index) => (
-                  <div key={index} className="flex gap-2 items-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => updateQueryParam(index, 'enabled', !param.enabled)}
-                      className={`w-4 h-4 rounded border p-0 ${
-                        param.enabled ? 'bg-primary border-primary text-primary-foreground hover:bg-primary/90' : 'border-gray-300 hover:bg-muted'
-                      }`}
-                    >
-                      {param.enabled && <Check className="h-3 w-3" />}
-                    </Button>
-                    <Input
-                      placeholder="Key"
-                      value={param.key}
-                      onChange={(e) => updateQueryParam(index, 'key', e.target.value)}
-                      className="flex-1 text-xs h-8"
-                    />
-                    <Input
-                      placeholder="Value"
-                      value={param.value}
-                      onChange={(e) => updateQueryParam(index, 'value', e.target.value)}
-                      className="flex-1 text-xs h-8"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeQueryParam(index)}
-                      className="h-7 w-7"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button variant="ghost" size="sm" onClick={addQueryParam} className="text-xs">
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add Query Param
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="headers" className="mt-0 h-full">
-              <div className="space-y-2">
-                {headers.map((header, index) => (
-                  <div key={index} className="flex gap-2 items-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => updateHeader(index, 'enabled', !header.enabled)}
-                      className={`w-4 h-4 rounded border p-0 ${
-                        header.enabled ? 'bg-primary border-primary text-primary-foreground hover:bg-primary/90' : 'border-gray-300 hover:bg-muted'
-                      }`}
-                    >
-                      {header.enabled && <Check className="h-3 w-3" />}
-                    </Button>
-                    <Input
-                      placeholder="Key"
-                      value={header.key}
-                      onChange={(e) => updateHeader(index, 'key', e.target.value)}
-                      className="flex-1 text-xs h-8"
-                    />
-                    <Input
-                      placeholder="Value"
-                      value={header.value}
-                      onChange={(e) => updateHeader(index, 'value', e.target.value)}
-                      className="flex-1 text-xs h-8"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeHeader(index)}
-                      className="h-7 w-7"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button variant="ghost" size="sm" onClick={addHeader} className="text-xs">
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add Header
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="body" className="mt-0 h-full">
-              <div className="space-y-2 h-full flex flex-col">
-                <div className="flex items-center gap-2">
-                  <Select value={body.type} onValueChange={(v) => setBody({ ...body, type: v as RequestBody['type'] })}>
-                    <SelectTrigger className="w-[140px] h-7 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none" className="text-xs">None</SelectItem>
-                      <SelectItem value="json" className="text-xs">JSON</SelectItem>
-                      <SelectItem value="form-data" className="text-xs">Form Data</SelectItem>
-                      <SelectItem value="raw" className="text-xs">Raw</SelectItem>
-                      <SelectItem value="binary" className="text-xs">Binary</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  {body.type === 'raw' && (
-                    <Select value={bodyLanguage} onValueChange={setBodyLanguage}>
-                      <SelectTrigger className="w-[120px] h-7 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="json" className="text-xs">JSON</SelectItem>
-                        <SelectItem value="javascript" className="text-xs">JavaScript</SelectItem>
-                        <SelectItem value="html" className="text-xs">HTML</SelectItem>
-                        <SelectItem value="xml" className="text-xs">XML</SelectItem>
-                        <SelectItem value="plaintext" className="text-xs">Text</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-
-                {body.type === 'none' && (
-                  <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-                    No body content
-                  </div>
-                )}
-
-                {(body.type === 'json' || body.type === 'raw') && (
-                  <div className="flex-1 border rounded min-h-[200px]">
-                    <MonacoEditor
-                      height="100%"
-                      language={body.type === 'json' ? 'json' : bodyLanguage}
-                      value={body.content}
-                      onChange={(value) => setBody({ ...body, content: value })}
-                    />
-                  </div>
-                )}
-
-                {body.type === 'form-data' && (
-                  <div className="space-y-2">
-                    {body.formData?.map((field, index) => (
-                      <div key={index} className="flex gap-2 items-center">
-                        <button
-                          onClick={() => updateFormDataField(index, 'enabled', !field.enabled)}
-                          className={`w-4 h-4 rounded border flex items-center justify-center ${
-                            field.enabled ? 'bg-primary border-primary text-primary-foreground' : 'border-gray-300'
-                          }`}
-                        >
-                          {field.enabled && <Check className="h-3 w-3" />}
-                        </button>
-                        <Input
-                          placeholder="Key"
-                          value={field.key}
-                          onChange={(e) => updateFormDataField(index, 'key', e.target.value)}
-                          className="flex-1 text-xs h-8"
-                        />
-                        {field.type === 'text' ? (
-                          <Input
-                            placeholder="Value"
-                            value={field.value}
-                            onChange={(e) => updateFormDataField(index, 'value', e.target.value)}
-                            className="flex-1 text-xs h-8"
-                          />
-                        ) : (
-                          <div className="flex-1 flex items-center gap-2 px-2 h-8 border rounded text-xs">
-                            <FileText className="h-3 w-3" />
-                            <span className="truncate">{field.fileName || 'No file selected'}</span>
-                            <input
-                              type="file"
-                              onChange={(e) => handleFileUpload(index, e.target.files?.[0] || null)}
-                              className="hidden"
-                              id={`file-${index}`}
-                            />
-                            <label htmlFor={`file-${index}`} className="cursor-pointer text-primary hover:underline ml-auto">
-                              Choose
-                            </label>
-                          </div>
-                        )}
-                        <Select 
-                          value={field.type} 
-                          onValueChange={(v) => updateFormDataField(index, 'type', v)}
-                        >
-                          <SelectTrigger className="w-[80px] h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="text" className="text-xs">Text</SelectItem>
-                            <SelectItem value="file" className="text-xs">File</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <button
-                          onClick={() => removeFormDataField(index)}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          <X className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      </div>
-                    ))}
-                    <Button variant="ghost" size="sm" onClick={addFormDataField} className="text-xs">
-                      <Plus className="h-3 w-3 mr-1" />
-                      Add Field
-                    </Button>
-                  </div>
-                )}
-
-                {body.type === 'binary' && (
-                  <div className="space-y-4">
-                    <input
-                      type="file"
-                      onChange={(e) => handleBinaryUpload(e.target.files?.[0] || null)}
-                      className="hidden"
-                      id="binary-file"
-                    />
-                    <label 
-                      htmlFor="binary-file"
-                      className="flex flex-col items-center justify-center h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
-                    >
-                      <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                      <span className="text-sm text-muted-foreground">
-                        {body.fileName ? body.fileName : 'Click to upload file'}
-                      </span>
-                    </label>
-                    {body.fileName && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setBody({ type: 'binary', content: '', fileName: undefined })}
-                        className="text-xs text-red-600"
-                      >
-                        <X className="h-3 w-3 mr-1" />
-                        Remove file
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="auth" className="mt-0 h-full">
-              <div className="space-y-4">
-                <Select value={auth.type} onValueChange={(v) => setAuth({ type: v as AuthConfig['type'] })}>
-                  <SelectTrigger className="w-[200px] h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none" className="text-xs">No Auth</SelectItem>
-                    <SelectItem value="basic" className="text-xs">Basic Auth</SelectItem>
-                    <SelectItem value="bearer" className="text-xs">Bearer Token</SelectItem>
-                    <SelectItem value="api-key" className="text-xs">API Key</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {auth.type === 'basic' && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Username"
-                        value={auth.basic?.username || ''}
-                        onChange={(e) => setAuth({ 
-                          type: 'basic', 
-                          basic: { ...auth.basic, username: e.target.value, password: auth.basic?.password || '' } 
-                        })}
-                        className="flex-1 text-xs h-8"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Lock className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="password"
-                        placeholder="Password"
-                        value={auth.basic?.password || ''}
-                        onChange={(e) => setAuth({ 
-                          type: 'basic', 
-                          basic: { ...auth.basic, username: auth.basic?.username || '', password: e.target.value } 
-                        })}
-                        className="flex-1 text-xs h-8"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {auth.type === 'bearer' && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Key className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Token"
-                        value={auth.bearer?.token || ''}
-                        onChange={(e) => setAuth({ type: 'bearer', bearer: { token: e.target.value } })}
-                        className="flex-1 text-xs h-8"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {auth.type === 'api-key' && (
-                  <div className="space-y-2">
-                    <Input
-                      placeholder="Key"
-                      value={auth.apiKey?.key || ''}
-                      onChange={(e) => setAuth({ 
-                        type: 'api-key', 
-                        apiKey: { 
-                          ...auth.apiKey, 
-                          key: e.target.value, 
-                          value: auth.apiKey?.value || '',
-                          in: auth.apiKey?.in || 'header'
-                        } 
-                      })}
-                      className="text-xs h-8"
-                    />
-                    <Input
-                      placeholder="Value"
-                      value={auth.apiKey?.value || ''}
-                      onChange={(e) => setAuth({ 
-                        type: 'api-key', 
-                        apiKey: { 
-                          ...auth.apiKey, 
-                          key: auth.apiKey?.key || '', 
-                          value: e.target.value,
-                          in: auth.apiKey?.in || 'header'
-                        } 
-                      })}
-                      className="text-xs h-8"
-                    />
-                    <Select 
-                      value={auth.apiKey?.in || 'header'} 
-                      onValueChange={(v) => setAuth({ 
-                        type: 'api-key', 
-                        apiKey: { 
-                          ...auth.apiKey, 
-                          key: auth.apiKey?.key || '', 
-                          value: auth.apiKey?.value || '',
-                          in: v as 'header' | 'query'
-                        } 
-                      })}
-                    >
-                      <SelectTrigger className="w-[120px] h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="header" className="text-xs">Header</SelectItem>
-                        <SelectItem value="query" className="text-xs">Query Param</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-          </div>
-        </Tabs>
+        <RequestBuilderTabs
+          headers={headers}
+          queryParams={queryParams}
+          pathParams={pathParams}
+          body={body}
+          auth={auth}
+          setBody={setBody}
+          setAuth={setAuth}
+          addHeader={addHeader}
+          removeHeader={removeHeader}
+          updateHeader={updateHeader}
+          addQueryParam={addQueryParam}
+          removeQueryParam={removeQueryParam}
+          updateQueryParam={updateQueryParam}
+          addPathParam={addPathParam}
+          removePathParam={removePathParam}
+          updatePathParam={updatePathParam}
+          addFormDataField={addFormDataField}
+          removeFormDataField={removeFormDataField}
+          updateFormDataField={updateFormDataField}
+          handleFileUpload={handleFileUpload}
+          handleBinaryUpload={handleBinaryUpload}
+        />
       </div>
 
       <div
@@ -1025,107 +163,8 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
         <div className={`w-16 h-1.5 rounded-full transition-all ${isDragging ? 'w-24 h-2 bg-primary' : 'bg-muted-foreground/40'}`} />
       </div>
 
-      {/* Response Section */}
-      <div className="flex-1 flex flex-col bg-card/65 overflow-hidden min-h-0 backdrop-blur-sm">
-        {response ? (
-          <>
-            {/* Response Status Bar */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background">
-              <div className="flex items-center gap-4">
-                {/* Status Badge */}
-                <div className={`px-3 py-1 rounded-md font-bold text-sm ${
-                  response.status >= 200 && response.status < 300 
-                    ? 'bg-green-100 text-green-700 border border-green-200' 
-                    : response.status >= 300 && response.status < 400
-                    ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
-                    : response.status >= 400
-                    ? 'bg-red-100 text-red-700 border border-red-200'
-                    : 'bg-gray-100 text-gray-700 border border-gray-200'
-                }`}>
-                  {response.status}
-                </div>
-                <span className="font-medium text-foreground">
-                  {response.statusText?.replace(/^\d+\s*/, '') || 'OK'}
-                </span>
-                
-                {/* Divider */}
-                <div className="w-px h-4 bg-border" />
-                
-                {/* Time */}
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <span className="font-mono">{response.time}ms</span>
-                </div>
-                
-                {/* Size */}
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <span className="font-mono">{(response.size / 1024).toFixed(2)} KB</span>
-                </div>
-                
-                {response.headers?.['X-Rocket-Mock'] && (
-                  <span className="text-xs font-medium bg-yellow-100 text-yellow-700 px-2 py-1 rounded border border-yellow-200">
-                    Mock Response
-                  </span>
-                )}
-              </div>
-              <Tabs value={responseTab} onValueChange={setResponseTab} className="w-auto">
-                <TabsList className="h-7 bg-transparent">
-                  <TabsTrigger value="body" className="text-xs h-6 data-[state=active]:bg-background">Body</TabsTrigger>
-                  <TabsTrigger value="headers" className="text-xs h-6 data-[state=active]:bg-background">Headers</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
+      <RequestBuilderResponsePanel response={response} />
 
-            {/* Response Content */}
-            <div className="flex-1 overflow-auto p-3">
-              {responseTab === 'body' && (
-                <div className="h-full flex flex-col">
-                  {/* Response Toolbar */}
-                  <div className="flex items-center justify-between mb-2 pb-2 border-b border-border/50">
-                    <span className="text-xs text-muted-foreground">Response Body</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(formatResponseBody(response.body))
-                      }}
-                      className="h-7 text-xs"
-                    >
-                      <Copy className="h-3.5 w-3.5 mr-1.5" />
-                      Copy
-                    </Button>
-                  </div>
-                  <div className="flex-1 min-h-0">
-                    <MonacoEditor
-                      height="100%"
-                      language="json"
-                      value={formatResponseBody(response.body)}
-                      onChange={() => {}}
-                    />
-                  </div>
-                </div>
-              )}
-              {responseTab === 'headers' && (
-                <div className="space-y-1">
-                  {response.headers && Object.entries(response.headers).map(([key, value]) => (
-                    <div key={key} className="flex text-xs">
-                      <span className="font-medium text-muted-foreground w-40 shrink-0">{key}:</span>
-                      <span className="text-foreground">{String(value)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            <div className="text-center">
-              <p className="text-sm">Send a request to see the response</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Alert Dialog */}
       <AlertDialog open={alertDialog.isOpen} onOpenChange={(open) => setAlertDialog(prev => ({ ...prev, isOpen: open }))}>
         <AlertDialogContent>
           <AlertDialogHeader>
