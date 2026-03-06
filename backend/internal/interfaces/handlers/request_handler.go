@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yourusername/rocket-api/internal/app/scripting"
 	"github.com/yourusername/rocket-api/internal/infrastructure/repository"
 )
 
@@ -65,6 +66,11 @@ type RequestPayload struct {
 	FileName    string            `json:"fileName,omitempty"`
 	QueryParams []QueryParam      `json:"queryParams"`
 	Auth        AuthConfig        `json:"auth"`
+	Scripts     *struct {
+		Language     string `json:"language"`
+		PreRequest   string `json:"preRequest"`
+		PostResponse string `json:"postResponse"`
+	} `json:"scripts,omitempty"`
 }
 
 type QueryParam struct {
@@ -107,6 +113,44 @@ func SendRequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	startTime := time.Now()
+
+	var preScriptResult *scripting.ExecutionResult
+	if payload.Scripts != nil && strings.TrimSpace(payload.Scripts.PreRequest) != "" {
+		scriptRequest := &scripting.RequestState{
+			Method:  payload.Method,
+			URL:     payload.URL,
+			Headers: payload.Headers,
+			Body:    payload.Body,
+		}
+		if scriptRequest.Headers == nil {
+			scriptRequest.Headers = map[string]string{}
+		}
+
+		execResult, execErr := scripting.ExecutePreRequestScript(
+			payload.Scripts.PreRequest,
+			payload.Scripts.Language,
+			scriptRequest,
+			map[string]string{},
+		)
+		if execErr != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"data": map[string]interface{}{
+					"scriptError": execErr.Error(),
+					"scriptResult": execResult,
+				},
+				"success": false,
+				"message": "Pre-request script failed",
+			})
+			return
+		}
+		preScriptResult = execResult
+		payload.Method = scriptRequest.Method
+		payload.URL = scriptRequest.URL
+		payload.Headers = scriptRequest.Headers
+		payload.Body = scriptRequest.Body
+	}
 
 	// Build URL with query parameters
 	finalURL := payload.URL
@@ -297,6 +341,45 @@ func SendRequestHandler(w http.ResponseWriter, r *http.Request) {
 		Time:       duration.Milliseconds(),
 	}
 
+	data := map[string]interface{}{
+		"status":     responsePayload.Status,
+		"statusText": responsePayload.StatusText,
+		"headers":    responsePayload.Headers,
+		"body":       responsePayload.Body,
+		"size":       responsePayload.Size,
+		"time":       responsePayload.Time,
+	}
+	if preScriptResult != nil {
+		data["preScriptResult"] = preScriptResult
+	}
+
+	responseScriptErr := ""
+	if payload.Scripts != nil && strings.TrimSpace(payload.Scripts.PostResponse) != "" {
+		postScriptResult, execErr := scripting.ExecutePostResponseScript(
+			payload.Scripts.PostResponse,
+			payload.Scripts.Language,
+			&scripting.RequestState{
+				Method:  payload.Method,
+				URL:     payload.URL,
+				Headers: payload.Headers,
+				Body:    payload.Body,
+			},
+			&scripting.ResponseState{
+				Status:  responsePayload.Status,
+				Headers: responsePayload.Headers,
+				Body:    string(bodyBytes),
+			},
+			map[string]string{},
+		)
+		if postScriptResult != nil {
+			data["scriptResult"] = postScriptResult
+		}
+		if execErr != nil {
+			responseScriptErr = execErr.Error()
+			data["scriptError"] = execErr.Error()
+		}
+	}
+
 	// Save to history if repository is configured
 	if historyRepo != nil {
 		historyEntry := &repository.HistoryEntry{
@@ -315,10 +398,15 @@ func SendRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	success := responseScriptErr == ""
+	message := "Request completed successfully"
+	if !success {
+		message = "Request completed with script error"
+	}
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"data":    responsePayload,
-		"success": true,
-		"message": "Request completed successfully",
+		"data":    data,
+		"success": success,
+		"message": message,
 	})
 }
 

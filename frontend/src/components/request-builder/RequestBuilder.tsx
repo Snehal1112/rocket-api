@@ -46,8 +46,10 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
     setPathParams,
     body,
     auth,
+    scripts,
     setBody,
     setAuth,
+    setScripts,
     isDirty,
     isLoading,
     response,
@@ -135,8 +137,10 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
           pathParams={pathParams}
           body={body}
           auth={auth}
+          scripts={scripts}
           setBody={setBody}
           setAuth={setAuth}
+          setScripts={setScripts}
           addHeader={addHeader}
           removeHeader={removeHeader}
           updateHeader={updateHeader}

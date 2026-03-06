@@ -378,3 +378,38 @@ params:path {
 		t.Fatalf("http.pathParams[0]: got %+v", parsed.HTTP.PathParams[0])
 	}
 }
+
+func TestParseContentScriptsRoundtrip(t *testing.T) {
+	original := &BruFile{}
+	original.Meta.Name = "Scripted Request"
+	original.Meta.Type = "http"
+	original.Meta.Seq = 1
+	original.HTTP.Method = "POST"
+	original.HTTP.URL = "https://api.example.com/orders"
+	original.Body.Type = "json"
+	original.Body.Data = `{"name":"demo"}`
+	original.Scripts = &Scripts{
+		Language: "typescript",
+		PreRequest: "pm.environment.set('token', 'abc')\npm.request.headers.add({ key: 'X-Trace-Id', value: '123' })",
+		PostResponse: "pm.test('status is 200', () => {\n  if (pm.response.code !== 200) throw new Error('invalid status')\n})",
+	}
+
+	content := GenerateContent(original)
+	parsed, err := ParseContent(content)
+	if err != nil {
+		t.Fatalf("ParseContent error: %v", err)
+	}
+
+	if parsed.Scripts == nil {
+		t.Fatalf("scripts: expected non-nil scripts")
+	}
+	if parsed.Scripts.Language != "typescript" {
+		t.Fatalf("scripts.language: got %q, want %q", parsed.Scripts.Language, "typescript")
+	}
+	if parsed.Scripts.PreRequest != original.Scripts.PreRequest {
+		t.Fatalf("scripts.preRequest: got %q, want %q", parsed.Scripts.PreRequest, original.Scripts.PreRequest)
+	}
+	if parsed.Scripts.PostResponse != original.Scripts.PostResponse {
+		t.Fatalf("scripts.postResponse: got %q, want %q", parsed.Scripts.PostResponse, original.Scripts.PostResponse)
+	}
+}

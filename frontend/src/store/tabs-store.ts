@@ -8,6 +8,7 @@ import {
   QueryParam,
   RequestBody,
   AuthConfig,
+  Scripts,
 } from '@/types'
 
 export interface RequestTab {
@@ -51,6 +52,7 @@ interface TabsState {
   updateActivePathParams: (params: QueryParam[]) => void
   updateActiveBody: (body: RequestBody) => void
   updateActiveAuth: (auth: AuthConfig) => void
+  updateActiveScripts: (scripts: Scripts) => void
 
   loadRequestInActiveTab: (
     request: HttpRequest,
@@ -78,6 +80,7 @@ const createDefaultRequest = (): HttpRequest => ({
   pathParams: [],
   body: { type: 'none', content: '' },
   auth: { type: 'none' },
+  scripts: { language: 'javascript', preRequest: '', postResponse: '' },
 })
 
 const serializePersistedRequest = (request: HttpRequest): string =>
@@ -90,6 +93,7 @@ const serializePersistedRequest = (request: HttpRequest): string =>
     pathParams: request.pathParams ?? [],
     body: request.body,
     auth: request.auth,
+    scripts: request.scripts ?? { language: 'javascript', preRequest: '', postResponse: '' },
   })
 
 const createTab = (request?: HttpRequest): RequestTab => {
@@ -286,6 +290,9 @@ export const useTabsStore = create<TabsState>()(
     updateActiveAuth: (auth) =>
       updateActiveRequest(request => ({ ...request, auth })),
 
+    updateActiveScripts: (scripts) =>
+      updateActiveRequest(request => ({ ...request, scripts })),
+
     loadRequestInActiveTab: (request, collectionName?, filePath?) =>
       loadRequestIntoTab(get().activeTabId, request, collectionName, filePath),
 
@@ -350,6 +357,7 @@ export const useTabsStore = create<TabsState>()(
           formData: req.body.formData,
           fileName: req.body.fileName,
         },
+        scripts: req.scripts ?? { language: 'javascript', preRequest: '', postResponse: '' },
       }
 
       const { apiService } = await import('@/lib/api')
@@ -440,6 +448,11 @@ export const useTabsStore = create<TabsState>()(
             fileName: bruFile.body.fileName,
           },
           auth: bruFile.http.auth ?? { type: 'none' },
+          scripts: {
+            language: bruFile.scripts?.language ?? 'javascript',
+            preRequest: bruFile.scripts?.preRequest ?? '',
+            postResponse: bruFile.scripts?.postResponse ?? '',
+          },
         }
 
         if (!isLatestLoadVersion(targetTabId, loadVersion)) return

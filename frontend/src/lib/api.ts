@@ -60,7 +60,8 @@ class ApiService {
         formData: request.body.formData,
         fileName: request.body.fileName,
         queryParams: request.queryParams.filter(q => q.enabled),
-        auth: request.auth
+        auth: request.auth,
+        scripts: request.scripts,
       })
 
       const endTime = Date.now()

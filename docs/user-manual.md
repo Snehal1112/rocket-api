@@ -9,6 +9,7 @@ Rocket supports:
 - Folder and request organization (Postman/Bruno style)
 - Multi-tab request editing and collection overview tabs
 - HTTP methods, headers, query params, auth, and request body editing
+- Request-level scripts (pre-request and post-response)
 - Environment + collection variables
 - Request history
 - Request templates
@@ -64,6 +65,22 @@ Rocket supports body modes:
 - `raw`
 - `form-data`
 - `binary`
+
+## 6.1 Scripts
+
+- Open the `Scripts` tab in Request Builder.
+- Use `Pre-request script` to modify outgoing request data (headers/body/url/variables) before send.
+- Use `Post-response script` to run checks after response is received.
+- Choose script language (`JavaScript` or `TypeScript`) from the language selector.
+
+Script APIs:
+- Postman-style: `pm.*`
+- Bruno-style: `bru.*`
+
+Current sandbox constraints:
+- No direct filesystem or process access.
+- No module import/require support.
+- Script runtime has execution timeout limits.
 
 ## 7. Collection Variables
 

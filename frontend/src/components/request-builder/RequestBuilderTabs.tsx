@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MonacoEditor } from '@/components/ui/monaco-editor'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AuthConfig, FormDataField, Header, QueryParam, RequestBody } from '@/types'
+import { AuthConfig, FormDataField, Header, QueryParam, RequestBody, Scripts } from '@/types'
 import { Check, FileText, Key, Lock, Plus, Upload, User, X } from 'lucide-react'
 import { useState } from 'react'
 
@@ -13,8 +13,10 @@ interface RequestBuilderTabsProps {
   pathParams: QueryParam[]
   body: RequestBody
   auth: AuthConfig
+  scripts: Scripts
   setBody: (body: RequestBody) => void
   setAuth: (auth: AuthConfig) => void
+  setScripts: (scripts: Scripts) => void
   addHeader: () => void
   removeHeader: (index: number) => void
   updateHeader: (
@@ -53,8 +55,10 @@ export function RequestBuilderTabs({
   pathParams,
   body,
   auth,
+  scripts,
   setBody,
   setAuth,
+  setScripts,
   addHeader,
   removeHeader,
   updateHeader,
@@ -87,6 +91,9 @@ export function RequestBuilderTabs({
         </TabsTrigger>
         <TabsTrigger value="auth" className="text-xs rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent">
           Auth {auth.type !== 'none' && '●'}
+        </TabsTrigger>
+        <TabsTrigger value="scripts" className="text-xs rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent">
+          Scripts
         </TabsTrigger>
       </TabsList>
 
@@ -479,8 +486,57 @@ export function RequestBuilderTabs({
             )}
           </div>
         </TabsContent>
+
+        <TabsContent value="scripts" className="mt-0 h-full" forceMount>
+          <div className="space-y-3 h-full flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Language</span>
+              <Select
+                value={scripts.language}
+                onValueChange={(v) =>
+                  setScripts({
+                    ...scripts,
+                    language: v as Scripts['language'],
+                  })
+                }
+              >
+                <SelectTrigger className="w-[160px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="javascript" className="text-xs">JavaScript</SelectItem>
+                  <SelectItem value="typescript" className="text-xs">TypeScript</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 flex-1 min-h-[260px]">
+              <div className="border rounded overflow-hidden min-h-[120px] flex flex-col">
+                <div className="text-[11px] px-2 py-1 border-b bg-muted/30 text-muted-foreground">Pre-request script</div>
+                <div className="flex-1 min-h-[100px]">
+                  <MonacoEditor
+                    height="100%"
+                    language={scripts.language}
+                    value={scripts.preRequest}
+                    onChange={(value) => setScripts({ ...scripts, preRequest: value })}
+                  />
+                </div>
+              </div>
+              <div className="border rounded overflow-hidden min-h-[120px] flex flex-col">
+                <div className="text-[11px] px-2 py-1 border-b bg-muted/30 text-muted-foreground">Post-response script</div>
+                <div className="flex-1 min-h-[100px]">
+                  <MonacoEditor
+                    height="100%"
+                    language={scripts.language}
+                    value={scripts.postResponse}
+                    onChange={(value) => setScripts({ ...scripts, postResponse: value })}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
       </div>
     </Tabs>
   )
 }
-

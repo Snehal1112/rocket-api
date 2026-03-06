@@ -73,6 +73,27 @@ describe('tabs-store save-target and dirty semantics', () => {
     expect(tab.isDirty).toBe(true)
   })
 
+  it('includes scripts in save payload', async () => {
+    saveRequestMock.mockResolvedValue({ path: 'requests/scripted.bru' })
+
+    const useTabsStore = await loadStore()
+    useTabsStore.getState().updateActiveScripts({
+      language: 'typescript',
+      preRequest: "pm.environment.set('token', 'abc')",
+      postResponse: "pm.test('ok', () => {})",
+    })
+
+    await useTabsStore.getState().saveActiveTab('example')
+
+    expect(saveRequestMock).toHaveBeenCalledTimes(1)
+    const [, , bruFile] = saveRequestMock.mock.calls[0]
+    expect(bruFile.scripts).toEqual({
+      language: 'typescript',
+      preRequest: "pm.environment.set('token', 'abc')",
+      postResponse: "pm.test('ok', () => {})",
+    })
+  })
+
   it('applies save completion to originating tab even after switching active tab', async () => {
     let resolveSave: ((value: { path: string }) => void) | undefined
     saveRequestMock.mockReturnValue(

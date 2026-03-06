@@ -8,6 +8,7 @@ export interface HttpRequest {
   queryParams: QueryParam[]
   pathParams?: QueryParam[]
   auth: AuthConfig
+  scripts?: Scripts
 }
 
 export interface HttpResponse {
@@ -115,8 +116,15 @@ export interface BruFile {
     pathParams?: QueryParam[]
   }
   body: RequestBody
+  scripts?: Scripts
   vars?: Record<string, unknown>
   assertions?: string[]
+}
+
+export interface Scripts {
+  language: 'javascript' | 'typescript'
+  preRequest: string
+  postResponse: string
 }
 
 export interface ApiResponse<T = unknown> {

@@ -52,6 +52,15 @@ Expected: HTTP 200 and healthy status.
 - Frontend API base URL is configured in `frontend/src/lib/api.ts`.
 - Current default backend URL is `http://localhost:8080/api/v1`.
 - Theme persistence key is `rocket-theme` in localStorage.
+- Request tab/session persistence key is `rocket-api:tabs-session:v1` in localStorage.
+
+### 4.1 Script Runtime Notes
+
+- Request execution supports pre-request and post-response scripts.
+- Runtime is backend sandboxed JavaScript execution with TS transpilation path.
+- Supported script aliases: `pm.*` and `bru.*`.
+- Runtime intentionally blocks direct filesystem/process/module access.
+- Script execution timeout is enforced to prevent infinite loops.
 
 ## 5. Data and Collection Storage
 

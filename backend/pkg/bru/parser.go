@@ -40,6 +40,13 @@ type AuthConfig struct {
 	} `json:"apiKey,omitempty"`
 }
 
+// Scripts represents request-level script configuration.
+type Scripts struct {
+	Language     string `json:"language,omitempty"`
+	PreRequest   string `json:"preRequest,omitempty"`
+	PostResponse string `json:"postResponse,omitempty"`
+}
+
 // BruFile represents the structure of a .bru file
 type BruFile struct {
 	Meta struct {
@@ -60,6 +67,7 @@ type BruFile struct {
 		Type string `json:"type"`
 		Data string `json:"data,omitempty"`
 	} `json:"body"`
+	Scripts    *Scripts `json:"scripts,omitempty"`
 	Vars       map[string]any `json:"vars,omitempty"`
 	Assertions []string       `json:"assertions,omitempty"`
 }
@@ -98,10 +106,11 @@ func ParseContent(content string) (*BruFile, error) {
 	scanner := bufio.NewScanner(strings.NewReader(content))
 	// contextStack tracks nested block names, e.g. ["http", "headers"].
 	var contextStack []string
-	// dataLines accumulates indented lines inside a data { } block.
+	// dataLines accumulates indented lines inside a multiline { } block.
 	var dataLines []string
 	inDataBlock := false
 	dataBlockIndent := 0
+	dataBlockTarget := ""
 
 	currentContext := func() string {
 		if len(contextStack) == 0 {
@@ -123,17 +132,37 @@ func ParseContent(content string) (*BruFile, error) {
 				if leadingWhitespace == dataBlockIndent {
 					inDataBlock = false
 					contextStack = contextStack[:len(contextStack)-1]
-					bru.Body.Data = strings.TrimRight(strings.Join(dataLines, "\n"), "\n")
+					captured := strings.TrimRight(strings.Join(dataLines, "\n"), "\n")
+					switch dataBlockTarget {
+					case "body":
+						bru.Body.Data = captured
+					case "scripts.pre-request":
+						if bru.Scripts == nil {
+							bru.Scripts = &Scripts{}
+						}
+						bru.Scripts.PreRequest = captured
+					case "scripts.post-response":
+						if bru.Scripts == nil {
+							bru.Scripts = &Scripts{}
+						}
+						bru.Scripts.PostResponse = captured
+					}
 					dataLines = nil
 					dataBlockIndent = 0
+					dataBlockTarget = ""
 					continue
 				}
 			}
 			stripped := line
-			if strings.HasPrefix(line, "    ") {
-				stripped = line[4:]
+			if dataBlockTarget == "body" {
+				if strings.HasPrefix(line, "    ") {
+					stripped = line[4:]
+				} else if strings.HasPrefix(line, "  ") {
+					// Bruno inline body blocks (`body:json {`) typically indent data by two spaces.
+					stripped = line[2:]
+				}
 			} else if strings.HasPrefix(line, "  ") {
-				// Bruno inline body blocks (`body:json {`) typically indent data by two spaces.
+				// Script blocks are emitted with two-space indentation.
 				stripped = line[2:]
 			}
 			dataLines = append(dataLines, stripped)
@@ -161,11 +190,23 @@ func ParseContent(content string) (*BruFile, error) {
 			if blockName == "data" {
 				inDataBlock = true
 				dataBlockIndent = blockIndent
+				dataBlockTarget = "body"
 			}
 			if bodyType, ok := strings.CutPrefix(blockName, "body:"); ok {
 				bru.Body.Type = strings.TrimSpace(bodyType)
 				inDataBlock = true
 				dataBlockIndent = blockIndent
+				dataBlockTarget = "body"
+			}
+			if strings.EqualFold(blockName, "script:pre-request") {
+				inDataBlock = true
+				dataBlockIndent = blockIndent
+				dataBlockTarget = "scripts.pre-request"
+			}
+			if strings.EqualFold(blockName, "script:post-response") {
+				inDataBlock = true
+				dataBlockIndent = blockIndent
+				dataBlockTarget = "scripts.post-response"
 			}
 			if method, ok := httpMethodForBlock(blockName); ok {
 				bru.HTTP.Method = method
@@ -261,6 +302,16 @@ func ParseContent(content string) (*BruFile, error) {
 			if v, ok := strings.CutPrefix(trimmed, "type:"); ok {
 				bru.Body.Type = strings.TrimSpace(v)
 			}
+		case "script":
+			if v, ok := strings.CutPrefix(trimmed, "language:"); ok {
+				if bru.Scripts == nil {
+					bru.Scripts = &Scripts{}
+				}
+				language := strings.ToLower(strings.TrimSpace(v))
+				if language == "javascript" || language == "typescript" {
+					bru.Scripts.Language = language
+				}
+			}
 
 		default:
 			if authType, ok := strings.CutPrefix(ctx, "auth:"); ok {
@@ -305,6 +356,9 @@ func ParseContent(content string) (*BruFile, error) {
 
 	if bru.Body.Type == "" {
 		bru.Body.Type = "none"
+	}
+	if bru.Scripts != nil && bru.Scripts.Language == "" {
+		bru.Scripts.Language = "javascript"
 	}
 
 	return bru, nil
@@ -510,6 +564,37 @@ func GenerateContent(bru *BruFile) string {
 			}
 		}
 		content.WriteString("}\n\n")
+	}
+
+	// Scripts sections
+	if bru.Scripts != nil {
+		scriptLanguage := strings.ToLower(strings.TrimSpace(bru.Scripts.Language))
+		if scriptLanguage == "" {
+			scriptLanguage = "javascript"
+		}
+		if scriptLanguage != "javascript" && scriptLanguage != "typescript" {
+			scriptLanguage = "javascript"
+		}
+
+		content.WriteString("script {\n")
+		fmt.Fprintf(&content, "  language: %s\n", scriptLanguage)
+		content.WriteString("}\n\n")
+
+		if bru.Scripts.PreRequest != "" {
+			content.WriteString("script:pre-request {\n")
+			for line := range strings.SplitSeq(bru.Scripts.PreRequest, "\n") {
+				fmt.Fprintf(&content, "  %s\n", line)
+			}
+			content.WriteString("}\n\n")
+		}
+
+		if bru.Scripts.PostResponse != "" {
+			content.WriteString("script:post-response {\n")
+			for line := range strings.SplitSeq(bru.Scripts.PostResponse, "\n") {
+				fmt.Fprintf(&content, "  %s\n", line)
+			}
+			content.WriteString("}\n\n")
+		}
 	}
 
 	// Assertions section
