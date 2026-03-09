@@ -9,6 +9,19 @@ interface ConsoleState {
   clearEntries: () => void
 }
 
+function formatRequestBody(body: HttpRequest['body']): string {
+  if (body.type === 'form-data') {
+    return (body.formData ?? [])
+      .filter(f => f.enabled)
+      .map(f => f.type === 'file' ? `${f.key}: [file: ${f.fileName ?? 'unknown'}]` : `${f.key}: ${f.value}`)
+      .join('\n') || '(empty form)'
+  }
+  if (body.type === 'binary') {
+    return body.fileName ? `[binary: ${body.fileName}]` : '[binary: no file]'
+  }
+  return body.content
+}
+
 export const useConsoleStore = create<ConsoleState>((set) => ({
   entries: [],
 
@@ -25,7 +38,7 @@ export const useConsoleStore = create<ConsoleState>((set) => ({
       requestHeaders: req.headers
         .filter(h => h.enabled)
         .reduce<Record<string, string>>((acc, h) => ({ ...acc, [h.key]: h.value }), {}),
-      requestBody: req.body.content,
+      requestBody: formatRequestBody(req.body),
       responseHeaders: res.headers,
       responseBody: res.body,
     }

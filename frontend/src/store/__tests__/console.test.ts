@@ -67,6 +67,23 @@ describe('useConsoleStore', () => {
     expect(useConsoleStore.getState().entries).toHaveLength(0)
   })
 
+  it('formats form-data body fields', () => {
+    const reqWithFormData: HttpRequest = {
+      ...mockReq,
+      body: {
+        type: 'form-data',
+        content: '',
+        formData: [
+          { key: 'name', value: 'Alice', type: 'text', enabled: true },
+          { key: 'avatar', value: '', type: 'file', fileName: 'photo.jpg', enabled: true },
+          { key: 'disabled', value: 'x', type: 'text', enabled: false },
+        ],
+      },
+    }
+    useConsoleStore.getState().addEntry(reqWithFormData, mockRes)
+    expect(useConsoleStore.getState().entries[0].requestBody).toBe('name: Alice\navatar: [file: photo.jpg]')
+  })
+
   it('caps entries at 200, dropping oldest', () => {
     for (let i = 0; i < 201; i++) {
       useConsoleStore.getState().addEntry({ ...mockReq, url: `https://api.example.com/${i}` }, mockRes)
