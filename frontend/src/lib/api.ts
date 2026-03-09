@@ -70,7 +70,7 @@ class ApiService {
         status: response.data.data.status,
         statusText: response.data.data.statusText,
         headers: response.data.data.headers,
-        body: response.data.data.body,
+        body: this.normalizeBody(response.data.data.body),
         size: response.data.data.size,
         time: endTime - startTime
       }
@@ -83,8 +83,8 @@ class ApiService {
           status: axiosError.response.status,
           statusText: axiosError.response.statusText,
           headers: axiosError.response.headers,
-          body: JSON.stringify(axiosError.response.data, null, 2),
-          size: JSON.stringify(axiosError.response.data).length,
+          body: this.normalizeBody(axiosError.response.data),
+          size: this.normalizeBody(axiosError.response.data).length,
           time: endTime - startTime
         }
       }
@@ -298,6 +298,16 @@ class ApiService {
   async clearExpiredCookies(): Promise<number> {
     const response = await this.client.post<ApiResponse<number>>('/cookies/clear-expired')
     return response.data.data || 0
+  }
+
+  private normalizeBody(body: unknown): string {
+    if (typeof body === 'string') return body
+    if (body == null) return ''
+    try {
+      return JSON.stringify(body, null, 2)
+    } catch {
+      return '[unserializable]'
+    }
   }
 }
 
