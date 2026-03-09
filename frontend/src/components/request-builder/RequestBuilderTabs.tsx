@@ -487,7 +487,7 @@ export function RequestBuilderTabs({
           </div>
         </TabsContent>
 
-        <TabsContent value="scripts" className="mt-0 h-full" forceMount>
+        <TabsContent value="scripts" className="mt-0 h-full data-[state=inactive]:hidden" forceMount>
           <div className="space-y-3 h-full flex flex-col">
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Language</span>
