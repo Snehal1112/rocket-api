@@ -40,9 +40,7 @@ export const useConsoleStore = create<ConsoleState>((set) => ({
         .reduce<Record<string, string>>((acc, h) => ({ ...acc, [h.key]: h.value }), {}),
       requestBody: formatRequestBody(req.body),
       responseHeaders: res.headers,
-      responseBody: typeof res.body === 'string'
-        ? res.body
-        : JSON.stringify(res.body, null, 2),
+      responseBody: res.body,
     }
     set(state => ({
       entries: [entry, ...state.entries].slice(0, MAX_ENTRIES),

@@ -79,12 +79,13 @@ class ApiService {
       
       if (typeof error === 'object' && error !== null && 'response' in error) {
         const axiosError = error as { response: { status: number; statusText: string; headers: Record<string, string>; data: unknown } }
+        const errorBody = this.normalizeBody(axiosError.response.data)
         return {
           status: axiosError.response.status,
           statusText: axiosError.response.statusText,
           headers: axiosError.response.headers,
-          body: this.normalizeBody(axiosError.response.data),
-          size: this.normalizeBody(axiosError.response.data).length,
+          body: errorBody,
+          size: errorBody.length,
           time: endTime - startTime
         }
       }
