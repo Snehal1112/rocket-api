@@ -84,6 +84,15 @@ describe('useConsoleStore', () => {
     expect(useConsoleStore.getState().entries[0].requestBody).toBe('name: Alice\navatar: [file: photo.jpg]')
   })
 
+  it('formats binary body', () => {
+    const reqWithBinary: HttpRequest = {
+      ...mockReq,
+      body: { type: 'binary', content: '', fileName: 'data.bin' },
+    }
+    useConsoleStore.getState().addEntry(reqWithBinary, mockRes)
+    expect(useConsoleStore.getState().entries[0].requestBody).toBe('[binary: data.bin]')
+  })
+
   it('caps entries at 200, dropping oldest', () => {
     for (let i = 0; i < 201; i++) {
       useConsoleStore.getState().addEntry({ ...mockReq, url: `https://api.example.com/${i}` }, mockRes)
