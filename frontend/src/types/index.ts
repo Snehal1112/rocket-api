@@ -175,3 +175,18 @@ export interface Cookie {
   updatedAt: string
   collection?: string
 }
+
+export interface ConsoleEntry {
+  id: string
+  timestamp: string
+  method: HttpMethod
+  url: string
+  status: number
+  statusText: string
+  duration: number
+  size: number
+  requestHeaders: Record<string, string>
+  requestBody: string
+  responseHeaders: Record<string, string>
+  responseBody: string
+}
