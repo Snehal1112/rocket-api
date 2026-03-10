@@ -8,7 +8,7 @@ describe('tabs-store empty state', () => {
     localStorage.clear()
   })
 
-  it('starts with empty tabs when sessionStorage has no stored tabs', async () => {
+  it('starts with empty tabs when localStorage has no stored tabs', async () => {
     // No stored data → fresh load
     const { useTabsStore } = await import('@/store/tabs-store')
     const state = useTabsStore.getState()
