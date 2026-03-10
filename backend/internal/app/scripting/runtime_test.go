@@ -69,6 +69,31 @@ bru.test('body contains ok', () => {
 	}
 }
 
+func TestExecuteScript_CapturesConsoleLogs(t *testing.T) {
+	req := &RequestState{
+		Method:  "GET",
+		URL:     "https://api.example.com",
+		Headers: map[string]string{},
+	}
+	script := `
+console.log('hello', 'world')
+console.log(42)
+`
+	result, err := ExecutePreRequestScript(script, "javascript", req, map[string]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.ConsoleLogs) != 2 {
+		t.Fatalf("ConsoleLogs: want 2 entries, got %d: %v", len(result.ConsoleLogs), result.ConsoleLogs)
+	}
+	if result.ConsoleLogs[0] != "hello world" {
+		t.Errorf("ConsoleLogs[0]: want %q, got %q", "hello world", result.ConsoleLogs[0])
+	}
+	if result.ConsoleLogs[1] != "42" {
+		t.Errorf("ConsoleLogs[1]: want %q, got %q", "42", result.ConsoleLogs[1])
+	}
+}
+
 func TestExecuteScript_Timeout(t *testing.T) {
 	req := &RequestState{Method: "GET", URL: "https://api.example.com", Headers: map[string]string{}}
 	vars := map[string]string{}
