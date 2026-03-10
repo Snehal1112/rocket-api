@@ -239,11 +239,23 @@ export function useRequestBuilderState({ onRequestSent }: RequestBuilderStateOpt
         scripts,
       }
 
+      // Build a flat key→value map of all active env + collection variables so
+      // that pm.environment.get() / pm.variables.get() work in scripts.
+      const envVars: Record<string, string> = {}
+      for (const v of collectionVariables) {
+        if (v.enabled) envVars[v.key] = v.value
+      }
+      if (activeEnvironment) {
+        for (const v of activeEnvironment.variables) {
+          if (v.enabled) envVars[v.key] = v.value
+        }
+      }
+
       let httpResponse: HttpResponse
       let usedMockService = false
 
       try {
-        httpResponse = await apiService.sendRequest(request)
+        httpResponse = await apiService.sendRequest(request, envVars)
       } catch {
         httpResponse = await mockApiService.sendRequest(request)
         usedMockService = true

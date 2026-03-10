@@ -71,6 +71,7 @@ type RequestPayload struct {
 		PreRequest   string `json:"preRequest"`
 		PostResponse string `json:"postResponse"`
 	} `json:"scripts,omitempty"`
+	EnvironmentVariables map[string]string `json:"environmentVariables,omitempty"`
 }
 
 type QueryParam struct {
@@ -126,11 +127,16 @@ func SendRequestHandler(w http.ResponseWriter, r *http.Request) {
 			scriptRequest.Headers = map[string]string{}
 		}
 
+		// Seed variables with the environment/collection vars passed from the client.
+		initVars := make(map[string]string, len(payload.EnvironmentVariables))
+		for k, v := range payload.EnvironmentVariables {
+			initVars[k] = v
+		}
 		execResult, execErr := scripting.ExecutePreRequestScript(
 			payload.Scripts.PreRequest,
 			payload.Scripts.Language,
 			scriptRequest,
-			map[string]string{},
+			initVars,
 		)
 		if execErr != nil {
 			w.Header().Set("Content-Type", "application/json")
@@ -355,6 +361,17 @@ func SendRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 	responseScriptErr := ""
 	if payload.Scripts != nil && strings.TrimSpace(payload.Scripts.PostResponse) != "" {
+		// Start with the client's env vars, then layer in any vars the pre-script set,
+		// so pm.environment.get() sees both in the post-response script.
+		postVars := make(map[string]string, len(payload.EnvironmentVariables))
+		for k, v := range payload.EnvironmentVariables {
+			postVars[k] = v
+		}
+		if preScriptResult != nil {
+			for k, v := range preScriptResult.Variables {
+				postVars[k] = v
+			}
+		}
 		postScriptResult, execErr := scripting.ExecutePostResponseScript(
 			payload.Scripts.PostResponse,
 			payload.Scripts.Language,
@@ -369,7 +386,7 @@ func SendRequestHandler(w http.ResponseWriter, r *http.Request) {
 				Headers: responsePayload.Headers,
 				Body:    string(bodyBytes),
 			},
-			map[string]string{},
+			postVars,
 		)
 		if postScriptResult != nil {
 			data["scriptResult"] = postScriptResult

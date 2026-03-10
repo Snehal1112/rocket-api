@@ -39,7 +39,7 @@ class ApiService {
     }
   }
 
-  async sendRequest(request: HttpRequest): Promise<HttpResponse> {
+  async sendRequest(request: HttpRequest, environmentVariables?: Record<string, string>): Promise<HttpResponse> {
     const isAvailable = await this.checkBackendHealth()
     if (!isAvailable) {
       throw new Error('Backend not available')
@@ -62,6 +62,7 @@ class ApiService {
         queryParams: request.queryParams.filter(q => q.enabled),
         auth: request.auth,
         scripts: request.scripts,
+        environmentVariables: environmentVariables ?? {},
       })
 
       const endTime = Date.now()
