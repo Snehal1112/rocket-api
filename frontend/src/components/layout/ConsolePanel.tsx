@@ -46,31 +46,43 @@ function HeaderTable({ headers }: { headers: Record<string, string> }) {
 
 function EntryDetail({ entry }: { entry: ConsoleEntry }) {
   return (
-    <div className="grid grid-cols-2 gap-2 px-4 py-2 bg-muted/30 border-t text-[11px]">
-      <div>
-        <div className="font-medium text-muted-foreground mb-1">Request Headers</div>
-        <div className="font-mono bg-background/60 rounded p-1.5 max-h-32 overflow-auto">
-          <HeaderTable headers={entry.requestHeaders} />
+    <div className="px-4 py-2 bg-muted/30 border-t text-[11px] space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <div className="font-medium text-muted-foreground mb-1">Request Headers</div>
+          <div className="font-mono bg-background/60 rounded p-1.5 max-h-32 overflow-auto">
+            <HeaderTable headers={entry.requestHeaders} />
+          </div>
+        </div>
+        <div>
+          <div className="font-medium text-muted-foreground mb-1">Request Body</div>
+          <pre className="font-mono whitespace-pre-wrap break-all bg-background/60 rounded p-1.5 max-h-32 overflow-auto">
+            {entry.requestBody || '(empty)'}
+          </pre>
+        </div>
+        <div>
+          <div className="font-medium text-muted-foreground mb-1">Response Headers</div>
+          <div className="font-mono bg-background/60 rounded p-1.5 max-h-32 overflow-auto">
+            <HeaderTable headers={entry.responseHeaders} />
+          </div>
+        </div>
+        <div>
+          <div className="font-medium text-muted-foreground mb-1">Response Body</div>
+          <pre className="font-mono whitespace-pre-wrap break-all bg-background/60 rounded p-1.5 max-h-32 overflow-auto">
+            {entry.responseBody || '(empty)'}
+          </pre>
         </div>
       </div>
-      <div>
-        <div className="font-medium text-muted-foreground mb-1">Request Body</div>
-        <pre className="font-mono whitespace-pre-wrap break-all bg-background/60 rounded p-1.5 max-h-32 overflow-auto">
-          {entry.requestBody || '(empty)'}
-        </pre>
-      </div>
-      <div>
-        <div className="font-medium text-muted-foreground mb-1">Response Headers</div>
-        <div className="font-mono bg-background/60 rounded p-1.5 max-h-32 overflow-auto">
-          <HeaderTable headers={entry.responseHeaders} />
+      {entry.consoleLogs.length > 0 && (
+        <div>
+          <div className="font-medium text-muted-foreground mb-1">Script Logs</div>
+          <div className="font-mono bg-background/60 rounded p-1.5 max-h-40 overflow-auto space-y-0.5">
+            {entry.consoleLogs.map((line, i) => (
+              <div key={i} className="text-foreground/80 whitespace-pre-wrap break-all">{line}</div>
+            ))}
+          </div>
         </div>
-      </div>
-      <div>
-        <div className="font-medium text-muted-foreground mb-1">Response Body</div>
-        <pre className="font-mono whitespace-pre-wrap break-all bg-background/60 rounded p-1.5 max-h-32 overflow-auto">
-          {entry.responseBody || '(empty)'}
-        </pre>
-      </div>
+      )}
     </div>
   )
 }
