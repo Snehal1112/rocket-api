@@ -39,6 +39,8 @@ describe('ConsolePanel', () => {
         requestBody: '',
         responseHeaders: {},
         responseBody: '{}',
+        consoleLogs: [],
+        scriptTests: [],
       }],
     })
     render(<ConsolePanel {...defaultProps} />)
@@ -62,6 +64,8 @@ describe('ConsolePanel', () => {
         requestBody: '{"name":"Alice"}',
         responseHeaders: { 'content-type': 'application/json' },
         responseBody: '{"id":1}',
+        consoleLogs: [],
+        scriptTests: [],
       }],
     })
     render(<ConsolePanel {...defaultProps} />)
@@ -90,6 +94,8 @@ describe('ConsolePanel', () => {
         requestBody: '',
         responseHeaders: {},
         responseBody: '',
+        consoleLogs: [],
+        scriptTests: [],
       }],
     })
     render(<ConsolePanel {...defaultProps} />)

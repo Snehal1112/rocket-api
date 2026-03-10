@@ -102,4 +102,33 @@ describe('useConsoleStore', () => {
     expect(entries[0].url).toBe('https://api.example.com/200')
     expect(entries.find(e => e.url === 'https://api.example.com/0')).toBeUndefined()
   })
+
+  it('stores consoleLogs from script results', () => {
+    const resWithLogs: HttpResponse = {
+      ...mockRes,
+      preScriptResult: {
+        tests: [],
+        variables: {},
+        consoleLogs: ['pre log 1'],
+      },
+      scriptResult: {
+        tests: [{ name: 'status ok', passed: true }],
+        variables: {},
+        consoleLogs: ['post log 1', 'post log 2'],
+      },
+    }
+    useConsoleStore.getState().addEntry(mockReq, resWithLogs)
+    const entry = useConsoleStore.getState().entries[0]
+    expect(entry.consoleLogs).toEqual(['pre log 1', 'post log 1', 'post log 2'])
+    expect(entry.scriptTests).toHaveLength(1)
+    expect(entry.scriptTests[0].name).toBe('status ok')
+    expect(entry.scriptTests[0].passed).toBe(true)
+  })
+
+  it('stores empty consoleLogs when no scripts ran', () => {
+    useConsoleStore.getState().addEntry(mockReq, mockRes)
+    const entry = useConsoleStore.getState().entries[0]
+    expect(entry.consoleLogs).toEqual([])
+    expect(entry.scriptTests).toEqual([])
+  })
 })
