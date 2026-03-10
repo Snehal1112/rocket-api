@@ -20,6 +20,7 @@ export function EnvironmentsDialog({ open, onOpenChange }: EnvironmentsDialogPro
   const {
     environments,
     activeCollection,
+    activeEnvironment,
     createEnvironment,
     saveEnvironment,
     deleteEnvironment,
@@ -32,6 +33,14 @@ export function EnvironmentsDialog({ open, onOpenChange }: EnvironmentsDialogPro
   const [newEnvName, setNewEnvName] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [revealedSecrets, setRevealedSecrets] = useState<Set<number>>(new Set())
+
+  // Auto-select the active environment when the dialog opens and nothing is
+  // selected yet, so the user immediately sees their current env's variables.
+  useEffect(() => {
+    if (open && !selectedEnvName && activeEnvironment) {
+      setSelectedEnvName(activeEnvironment.name)
+    }
+  }, [open, activeEnvironment, selectedEnvName])
 
   const selectedEnv = environments.find(e => e.name === selectedEnvName) ?? null
 
