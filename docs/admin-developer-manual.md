@@ -43,9 +43,9 @@ curl -i http://localhost:8080/health
 
 Expected: HTTP 200 and healthy status.
 
-![Backend Running](./manual-assets/screenshots/light/13-backend-running-light.png)
-![Frontend Running](./manual-assets/screenshots/light/14-frontend-running-light.png)
-![API Health Check](./manual-assets/screenshots/light/15-api-health-check-light.png)
+![Backend Running](./manual-assets/screenshots/light/14-backend-running-light.png)
+![Frontend Running](./manual-assets/screenshots/light/15-frontend-running-light.png)
+![API Health Check](./manual-assets/screenshots/light/16-api-health-check-light.png)
 
 ## 4. Configuration Notes
 
@@ -62,12 +62,14 @@ Expected: HTTP 200 and healthy status.
 - Supported script aliases: `pm.*` and `bru.*`.
 - Runtime intentionally blocks direct filesystem/process/module access.
 - Script execution timeout is enforced to prevent infinite loops.
+- The user manual documents the editor UI with a dedicated Scripts-tab screenshot;
+  response output remains documented separately in the response-panel section.
 
 ## 5. Data and Collection Storage
 
 Collections are file-based and live under workspace collection paths.
 
-![Collections Filesystem](./manual-assets/screenshots/light/16-collections-filesystem-light.png)
+![Collections Filesystem](./manual-assets/screenshots/light/17-collections-filesystem-light.png)
 
 Operational notes:
 - Keep collection files in version control when possible.
@@ -87,7 +89,7 @@ From `backend/`:
 go test ./...
 ```
 
-![Test and Lint Output](./manual-assets/screenshots/light/17-test-lint-output-light.png)
+![Test and Lint Output](./manual-assets/screenshots/light/18-test-lint-output-light.png)
 
 ## 7. Screenshot Workflow (Both Themes)
 
@@ -104,10 +106,11 @@ Use `docs/manual-assets/screenshot-manifest.md` as the capture checklist.
 ```
 
 The script scaffolds deterministic filenames and supports an auto-capture path when Playwright is installed.
+It now includes a dedicated `06-scripts-tab` scene alongside the request builder screenshots.
 
 ## 8. Troubleshooting (Admin/Developer)
 
-![Troubleshooting Flow](./manual-assets/screenshots/light/18-troubleshooting-flow-light.png)
+![Troubleshooting Flow](./manual-assets/screenshots/light/19-troubleshooting-flow-light.png)
 
 ### 8.1 Frontend cannot reach backend
 - Confirm backend process is running.

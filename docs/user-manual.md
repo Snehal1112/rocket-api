@@ -83,10 +83,12 @@ Rocket supports body modes:
 
 ## 7.1 Scripts
 
-- Open the `Scripts` tab in Request Builder.
+![Scripts Tab](./manual-assets/screenshots/light/06-scripts-tab-light.png)
+
+- Open the `Scripts` tab in Request Builder to access the request-level script editors.
+- Use the language selector to switch between `JavaScript` and `TypeScript`.
 - Use `Pre-request script` to modify outgoing request data (headers/body/url/variables) before send.
 - Use `Post-response script` to run checks after response is received.
-- Choose script language (`JavaScript` or `TypeScript`) from the language selector.
 
 Script APIs:
 - Postman-style: `pm.*`
@@ -99,7 +101,7 @@ Current sandbox constraints:
 
 ## 8. Collection Variables
 
-![Variables Editor](./manual-assets/screenshots/light/06-variables-editor-light.png)
+![Variables Editor](./manual-assets/screenshots/light/07-variables-editor-light.png)
 
 - Open collection overview tab.
 - Switch to `Variables` tab.
@@ -109,7 +111,7 @@ Current sandbox constraints:
 
 ## 9. Environments
 
-![Environments Dialog](./manual-assets/screenshots/light/07-environments-dialog-light.png)
+![Environments Dialog](./manual-assets/screenshots/light/08-environments-dialog-light.png)
 
 - Create per-collection environments.
 - Use environment variables to override collection variables.
@@ -117,7 +119,7 @@ Current sandbox constraints:
 
 ## 10. Send Request and Analyze Response
 
-![Response Panel](./manual-assets/screenshots/light/08-response-panel-light.png)
+![Response Panel](./manual-assets/screenshots/light/09-response-panel-light.png)
 
 Response area provides:
 - Status code and status text
@@ -128,14 +130,14 @@ Response area provides:
 
 ## 11. History
 
-![History Tab](./manual-assets/screenshots/light/09-history-tab-light.png)
+![History Tab](./manual-assets/screenshots/light/10-history-tab-light.png)
 
 - Open `History` tab in sidebar.
 - Click any history item to load it into active request tab.
 
 ## 12. Templates
 
-![Templates Dialog](./manual-assets/screenshots/light/10-templates-dialog-light.png)
+![Templates Dialog](./manual-assets/screenshots/light/11-templates-dialog-light.png)
 
 - Click `Templates` in status bar.
 - Pick template category and template.
@@ -143,14 +145,14 @@ Response area provides:
 
 ## 13. Cookies
 
-![Cookies Dialog](./manual-assets/screenshots/light/11-cookies-dialog-light.png)
+![Cookies Dialog](./manual-assets/screenshots/light/12-cookies-dialog-light.png)
 
 - Click `Cookies` in status bar.
 - View by domain, delete specific cookies, clear expired/all.
 
 ## 14. Status Bar Actions
 
-![Status Bar Actions](./manual-assets/screenshots/light/12-status-bar-actions-light.png)
+![Status Bar Actions](./manual-assets/screenshots/light/13-status-bar-actions-light.png)
 
 Quick actions:
 - `New`

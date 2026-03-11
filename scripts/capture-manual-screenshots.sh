@@ -105,19 +105,20 @@ const scenes = [
   { name: '03-request-tabs' },
   { name: '04-request-builder-url' },
   { name: '05-request-builder-body' },
-  { name: '06-variables-editor' },
-  { name: '07-environments-dialog' },
-  { name: '08-response-panel' },
-  { name: '09-history-tab' },
-  { name: '10-templates-dialog' },
-  { name: '11-cookies-dialog' },
-  { name: '12-status-bar-actions' },
-  { name: '13-backend-running' },
-  { name: '14-frontend-running' },
-  { name: '15-api-health-check' },
-  { name: '16-collections-filesystem' },
-  { name: '17-test-lint-output' },
-  { name: '18-troubleshooting-flow' },
+  { name: '06-scripts-tab' },
+  { name: '07-variables-editor' },
+  { name: '08-environments-dialog' },
+  { name: '09-response-panel' },
+  { name: '10-history-tab' },
+  { name: '11-templates-dialog' },
+  { name: '12-cookies-dialog' },
+  { name: '13-status-bar-actions' },
+  { name: '14-backend-running' },
+  { name: '15-frontend-running' },
+  { name: '16-api-health-check' },
+  { name: '17-collections-filesystem' },
+  { name: '18-test-lint-output' },
+  { name: '19-troubleshooting-flow' },
 ];
 
 async function api(pathname, options = {}) {
@@ -200,6 +201,18 @@ async function seedManualDemo() {
           type: 'json',
           data: JSON.stringify({ name: 'Jane Doe', email: 'jane@example.com' }, null, 2),
         },
+        scripts: {
+          language: 'typescript',
+          preRequest: [
+            "pm.environment.set('traceId', 'manual-trace')",
+            "bru.setVar('tenant', 'demo')",
+          ].join('\n'),
+          postResponse: [
+            "pm.test('status is 200', () => {",
+            '  pm.expect(pm.response.code).to.equal(200)',
+            '})',
+          ].join('\n'),
+        },
       },
     },
     {
@@ -279,15 +292,32 @@ async function clickIfVisible(locator) {
   }
 }
 
+async function ensureRequestVisible(page, collectionButton, folderButton, requestButton) {
+  if (await requestButton.count()) {
+    return;
+  }
+
+  await clickIfVisible(collectionButton);
+  await page.waitForTimeout(150);
+
+  if (!(await requestButton.count())) {
+    await clickIfVisible(folderButton);
+    await page.waitForTimeout(150);
+  }
+}
+
 async function setupScene(page, sceneName, theme) {
   await ensureTheme(page, theme);
   await page.waitForTimeout(250);
 
-  const collectionButton = page.locator('button:has-text("manual-demo")');
-  const requestListUsers = page.locator('button:has-text("List Users")');
-  const requestCreateUser = page.locator('button:has-text("Create User")');
-  const historyTab = page.locator('button:has-text("History")');
-  const collectionsTab = page.locator('button:has-text("Collections")');
+  const sidebar = page.locator('aside');
+  const collectionButton = sidebar.getByRole('button', { name: /manual-demo/i }).first();
+  const usersFolderButton = sidebar.getByRole('button', { name: /^Users$/ }).first();
+  const requestListUsers = sidebar.getByRole('button', { name: /List Users/i }).first();
+  const requestCreateUser = sidebar.getByRole('button', { name: /Create User/i }).first();
+  const historyTab = sidebar.getByRole('button', { name: /^History$/ }).first();
+  const collectionsTab = sidebar.getByRole('button', { name: /^Collections$/ }).first();
+  const scriptsTab = page.locator('button:has-text("Scripts")');
 
   if (sceneName === '01-workspace-overview') {
     return;
@@ -299,88 +329,96 @@ async function setupScene(page, sceneName, theme) {
   }
 
   if (sceneName === '03-request-tabs') {
-    await clickIfVisible(collectionButton);
+    await ensureRequestVisible(page, collectionButton, usersFolderButton, requestListUsers);
     await clickIfVisible(requestListUsers);
     await clickIfVisible(requestCreateUser);
     return;
   }
 
   if (sceneName === '04-request-builder-url') {
-    await clickIfVisible(collectionButton);
+    await ensureRequestVisible(page, collectionButton, usersFolderButton, requestListUsers);
     await clickIfVisible(requestListUsers);
     await clickIfVisible(page.getByPlaceholder('Enter URL (use {{variable}} for env vars)'));
     return;
   }
 
   if (sceneName === '05-request-builder-body') {
-    await clickIfVisible(collectionButton);
+    await ensureRequestVisible(page, collectionButton, usersFolderButton, requestCreateUser);
     await clickIfVisible(requestCreateUser);
     await clickIfVisible(page.locator('button:has-text("Body")'));
     return;
   }
 
-  if (sceneName === '06-variables-editor') {
+  if (sceneName === '06-scripts-tab') {
+    await ensureRequestVisible(page, collectionButton, usersFolderButton, requestCreateUser);
+    await clickIfVisible(requestCreateUser);
+    await clickIfVisible(scriptsTab);
+    await page.waitForTimeout(400);
+    return;
+  }
+
+  if (sceneName === '07-variables-editor') {
     await clickIfVisible(collectionButton);
     await clickIfVisible(page.locator('button:has-text("manual-demo")'));
     await clickIfVisible(page.locator('[role="tab"]:has-text("Variables")'));
     return;
   }
 
-  if (sceneName === '07-environments-dialog') {
-    await clickIfVisible(collectionButton);
+  if (sceneName === '08-environments-dialog') {
+    await ensureRequestVisible(page, collectionButton, usersFolderButton, requestListUsers);
     await clickIfVisible(requestListUsers);
     await clickIfVisible(page.locator('button[title="Manage environments"]'));
     return;
   }
 
-  if (sceneName === '08-response-panel') {
-    await clickIfVisible(collectionButton);
+  if (sceneName === '09-response-panel') {
+    await ensureRequestVisible(page, collectionButton, usersFolderButton, requestListUsers);
     await clickIfVisible(requestListUsers);
     await clickIfVisible(page.locator('button:has-text("Send")'));
     await page.waitForTimeout(1200);
     return;
   }
 
-  if (sceneName === '09-history-tab') {
+  if (sceneName === '10-history-tab') {
     await clickIfVisible(historyTab);
     await page.waitForTimeout(300);
     return;
   }
 
-  if (sceneName === '10-templates-dialog') {
+  if (sceneName === '11-templates-dialog') {
     await clickIfVisible(collectionsTab);
     await clickIfVisible(page.locator('button:has-text("Templates")'));
     return;
   }
 
-  if (sceneName === '11-cookies-dialog') {
+  if (sceneName === '12-cookies-dialog') {
     await clickIfVisible(collectionsTab);
     await clickIfVisible(page.locator('button:has-text("Cookies")'));
     return;
   }
 
-  if (sceneName === '12-status-bar-actions') {
+  if (sceneName === '13-status-bar-actions') {
     await clickIfVisible(collectionsTab);
     await page.locator('div.h-7').last().scrollIntoViewIfNeeded();
     return;
   }
 
-  if (sceneName === '13-backend-running') {
+  if (sceneName === '14-backend-running') {
     await page.goto(`${app.protocol}//${app.hostname}:8080/api/v1/collections`, { waitUntil: 'networkidle' });
     return;
   }
 
-  if (sceneName === '14-frontend-running') {
+  if (sceneName === '15-frontend-running') {
     await page.goto(appUrl, { waitUntil: 'networkidle' });
     return;
   }
 
-  if (sceneName === '15-api-health-check') {
+  if (sceneName === '16-api-health-check') {
     await page.goto(`${app.protocol}//${app.hostname}:8080/health`, { waitUntil: 'networkidle' });
     return;
   }
 
-  if (sceneName === '16-collections-filesystem') {
+  if (sceneName === '17-collections-filesystem') {
     await page.setContent(`
       <html><body style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 24px;">
       <h2>Collections Filesystem Snapshot</h2>
@@ -390,7 +428,7 @@ async function setupScene(page, sceneName, theme) {
     return;
   }
 
-  if (sceneName === '17-test-lint-output') {
+  if (sceneName === '18-test-lint-output') {
     await page.setContent(`
       <html><body style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 24px;">
       <h2>Quality Checks</h2>
@@ -400,7 +438,7 @@ async function setupScene(page, sceneName, theme) {
     return;
   }
 
-  if (sceneName === '18-troubleshooting-flow') {
+  if (sceneName === '19-troubleshooting-flow') {
     await page.setContent(`
       <html><body style="font-family: system-ui, -apple-system, Segoe UI, sans-serif; padding: 24px;">
       <h2>Troubleshooting Flow</h2>
