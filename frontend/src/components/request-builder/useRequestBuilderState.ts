@@ -14,10 +14,8 @@ import { useTabsStore } from '@/store/tabs-store'
 import { useCollectionsStore } from '@/store/collections'
 import { substituteRequestVariables } from '@/lib/environment'
 import { applyApiKeyToQueryParams } from '@/lib/request-auth'
-import { apiService } from '@/lib/api'
-import { mockApiService } from '@/lib/mock-api'
-import { useHistoryStore } from '@/store/history'
 import { parseCurlCommand } from '@/lib/curl-parser'
+import { useRequestExecution } from '@/features/request-builder/hooks/useRequestExecution'
 
 interface RequestBuilderStateOptions {
   onRequestSent?: (request: HttpRequest, response: HttpResponse) => void
@@ -27,80 +25,6 @@ interface AlertDialogState {
   isOpen: boolean
   title: string
   description: string
-}
-
-function applyScriptVariableUpdates(
-  activeEnvironment: ReturnType<typeof useCollectionsStore.getState>['activeEnvironment'],
-  collectionVariables: ReturnType<typeof useCollectionsStore.getState>['collectionVariables'],
-  scriptVars: Record<string, string>
-) {
-  const nextEnvironment = activeEnvironment
-    ? {
-        ...activeEnvironment,
-        variables: activeEnvironment.variables.map(variable => ({ ...variable })),
-      }
-    : null
-  const nextCollectionVariables = collectionVariables.map(variable => ({ ...variable }))
-
-  let environmentChanged = false
-  let collectionChanged = false
-
-  for (const [key, value] of Object.entries(scriptVars)) {
-    const envIndex =
-      nextEnvironment?.variables.findIndex(variable => variable.key === key) ?? -1
-    if (nextEnvironment && envIndex >= 0) {
-      const current = nextEnvironment.variables[envIndex]
-      if (current.value !== value || !current.enabled) {
-        nextEnvironment.variables[envIndex] = {
-          ...current,
-          value,
-          enabled: true,
-        }
-        environmentChanged = true
-      }
-      continue
-    }
-
-    const collectionIndex = nextCollectionVariables.findIndex(variable => variable.key === key)
-    if (collectionIndex >= 0) {
-      const current = nextCollectionVariables[collectionIndex]
-      if (current.value !== value || !current.enabled) {
-        nextCollectionVariables[collectionIndex] = {
-          ...current,
-          value,
-          enabled: true,
-        }
-        collectionChanged = true
-      }
-      continue
-    }
-
-    if (nextEnvironment) {
-      nextEnvironment.variables.push({
-        key,
-        value,
-        enabled: true,
-        secret: false,
-      })
-      environmentChanged = true
-      continue
-    }
-
-    nextCollectionVariables.push({
-      key,
-      value,
-      enabled: true,
-      secret: false,
-    })
-    collectionChanged = true
-  }
-
-  return {
-    nextEnvironment,
-    nextCollectionVariables,
-    environmentChanged,
-    collectionChanged,
-  }
 }
 
 export function useRequestBuilderState({ onRequestSent }: RequestBuilderStateOptions) {
@@ -115,6 +39,7 @@ export function useRequestBuilderState({ onRequestSent }: RequestBuilderStateOpt
   })
 
   const [envDialogOpen, setEnvDialogOpen] = useState(false)
+  const executeRequest = useRequestExecution({ onRequestSent })
 
   const {
     tabs,
@@ -410,59 +335,9 @@ export function useRequestBuilderState({ onRequestSent }: RequestBuilderStateOpt
         }
       }
 
-      let httpResponse: HttpResponse
-      let usedMockService = false
-
-      try {
-        httpResponse = await apiService.sendRequest(request, envVars)
-      } catch {
-        httpResponse = await mockApiService.sendRequest(request)
-        usedMockService = true
-      }
-
-      if (usedMockService) {
-        httpResponse.headers = {
-          ...httpResponse.headers,
-          'X-Rocket-Mock': 'true',
-        }
-      }
+      const httpResponse = await executeRequest(request, envVars)
 
       setActiveTabResponse(httpResponse)
-      const { fetchHistory } = useHistoryStore.getState()
-      fetchHistory()
-
-      // Write script-mutated variables back to env/collection vars (Postman-style).
-      // preScriptResult variables are superseded by postResponse, so merge in order.
-      const scriptVars: Record<string, string> = {
-        ...(httpResponse.preScriptResult?.variables ?? {}),
-        ...(httpResponse.scriptResult?.variables ?? {}),
-      }
-      const latestStore = useCollectionsStore.getState()
-      if (latestStore.activeCollection && Object.keys(scriptVars).length > 0) {
-        const {
-          nextEnvironment,
-          nextCollectionVariables,
-          environmentChanged,
-          collectionChanged,
-        } = applyScriptVariableUpdates(
-          latestStore.activeEnvironment,
-          latestStore.collectionVariables,
-          scriptVars
-        )
-
-        if (environmentChanged && nextEnvironment) {
-          await latestStore.saveEnvironment(latestStore.activeCollection.name, nextEnvironment)
-        }
-
-        if (collectionChanged) {
-          await latestStore.saveCollectionVariables(
-            latestStore.activeCollection.name,
-            nextCollectionVariables
-          )
-        }
-      }
-
-      if (onRequestSent) onRequestSent(request, httpResponse)
     } catch (error) {
       setActiveTabResponse({
         status: 0,
@@ -495,6 +370,7 @@ export function useRequestBuilderState({ onRequestSent }: RequestBuilderStateOpt
     updateActiveScripts,
     setActiveTabLoading,
     setActiveTabResponse,
+    executeRequest,
   ])
 
   useEffect(() => {
