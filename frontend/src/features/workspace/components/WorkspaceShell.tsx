@@ -7,17 +7,15 @@ import { ConsolePanel } from '@/components/layout/ConsolePanel'
 import { WelcomeScreen } from '@/components/layout/WelcomeScreen'
 import { useConsoleStore } from '@/store/console'
 import { ThemeProvider, useTheme } from 'next-themes'
-import { useState, useEffect, useCallback } from 'react'
-import { useWebSocket } from '@/hooks/use-websocket'
+import { useState, useEffect } from 'react'
 import { useCollectionsStore } from '@/store/collections'
 import { useTabsStore, isRequestTab } from '@/store/tabs-store'
 import { Sun, Moon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getRuntimeConfig } from '@/lib/runtime-config'
 import { Outlet } from 'react-router-dom'
 import { useRouteSyncedTabs } from '@/features/workspace/hooks/useRouteSyncedTabs'
+import { useRealtimeSync } from '@/features/realtime/hooks/useRealtimeSync'
 
-const runtimeConfig = getRuntimeConfig()
 const SIDEBAR_WIDTH_STORAGE_KEY = 'rocket-api:sidebar-width'
 const DEFAULT_SIDEBAR_WIDTH = 288
 const MIN_SIDEBAR_WIDTH = 220
@@ -71,7 +69,6 @@ function ThemeToggle() {
 
 export function WorkspaceShell() {
   const {
-    fetchCollections,
     activeCollection,
     collections,
     setActiveCollection,
@@ -80,78 +77,7 @@ export function WorkspaceShell() {
   const activeTabId = useTabsStore(state => state.activeTabId)
   const activeTab = tabs.find(t => t.id === activeTabId)
   useRouteSyncedTabs()
-
-  const handleFileChangeMessage = (message: {
-    collection?: string
-    data?: { relativePath?: string; type?: string }
-  }) => {
-    const relativePath = message.data?.relativePath ?? ''
-
-    if (relativePath.startsWith('environments/')) {
-      if (activeCollection && message.collection === activeCollection.name) {
-        useCollectionsStore.getState().fetchEnvironments(activeCollection.name)
-      }
-      return
-    }
-
-    if (relativePath === 'collection.bru') {
-      if (activeCollection && message.collection === activeCollection.name) {
-        const store = useCollectionsStore.getState()
-        if (store.consumeCollectionVariablesSelfEcho(activeCollection.name, relativePath)) {
-          return
-        }
-        store.fetchCollectionVariables(activeCollection.name)
-      }
-      return
-    }
-
-    if (!relativePath.includes('/') && relativePath !== '' && !relativePath.includes('.')) {
-      fetchCollections()
-      return
-    }
-
-    if (activeCollection && message.collection === activeCollection.name) {
-      useCollectionsStore.getState().fetchCollectionTree(activeCollection.name)
-    }
-  }
-
-  const {
-    send: sendWebSocketMessage,
-    isConnected: isWebSocketConnected,
-  } = useWebSocket(runtimeConfig.wsUrl, {
-    onMessage: (message) => {
-      if (message.type === 'file_change') {
-        console.log('File changed:', message)
-        handleFileChangeMessage(message as { collection?: string; data?: { relativePath?: string } })
-      }
-    },
-    onConnect: () => {
-      console.log('WebSocket connected - real-time sync enabled')
-    },
-    onDisconnect: () => {
-      console.log('WebSocket disconnected - real-time sync disabled')
-    }
-  })
-
-  const syncWebSocketSubscription = useCallback(() => {
-    if (!isWebSocketConnected) {
-      return
-    }
-
-    if (activeCollection?.name) {
-      sendWebSocketMessage({
-        type: 'subscribe',
-        collection: activeCollection.name,
-      })
-      return
-    }
-
-    sendWebSocketMessage({ type: 'unsubscribe' })
-  }, [activeCollection?.name, isWebSocketConnected, sendWebSocketMessage])
-
-  useEffect(() => {
-    syncWebSocketSubscription()
-  }, [syncWebSocketSubscription])
+  useRealtimeSync()
 
   useEffect(() => {
     if (!activeTab || collections.length === 0) return
