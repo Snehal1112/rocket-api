@@ -7,6 +7,8 @@ const fetchCollectionVariablesMock = vi.fn()
 const fetchEnvironmentsMock = vi.fn()
 const setActiveCollectionMock = vi.fn()
 const consumeCollectionVariablesSelfEchoMock = vi.fn()
+const sendWebSocketMessageMock = vi.fn()
+let isWebSocketConnectedMock = true
 
 const collectionsStoreState = {
   fetchCollections: fetchCollectionsMock,
@@ -37,7 +39,12 @@ const useTabsStoreMock = vi.fn((selector?: (state: typeof tabsStoreState) => unk
   selector ? selector(tabsStoreState) : tabsStoreState
 )
 
-const capturedWebSocketOptions: { current?: { onMessage?: (message: unknown) => void } } = {}
+const capturedWebSocketOptions: {
+  current?: {
+    onMessage?: (message: unknown) => void
+    onConnect?: () => void
+  }
+} = {}
 
 vi.mock('@/store/collections', () => ({
   useCollectionsStore: useCollectionsStoreMock,
@@ -51,6 +58,12 @@ vi.mock('@/store/tabs-store', () => ({
 vi.mock('@/hooks/use-websocket', () => ({
   useWebSocket: vi.fn((_url, options) => {
     capturedWebSocketOptions.current = options
+    return {
+      send: sendWebSocketMessageMock,
+      isConnected: isWebSocketConnectedMock,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    }
   }),
 }))
 
@@ -114,6 +127,8 @@ describe('App websocket file-change handling', () => {
     fetchEnvironmentsMock.mockReset()
     setActiveCollectionMock.mockReset()
     consumeCollectionVariablesSelfEchoMock.mockReset()
+    sendWebSocketMessageMock.mockReset()
+    isWebSocketConnectedMock = true
     capturedWebSocketOptions.current = undefined
   })
 
@@ -178,6 +193,46 @@ describe('App websocket file-change handling', () => {
       'collection.bru'
     )
     expect(fetchCollectionVariablesMock).toHaveBeenCalledWith('snehal')
+  })
+
+  it('subscribes to the active collection over websocket', async () => {
+    const { default: App } = await import('@/App')
+    render(<App />)
+
+    expect(sendWebSocketMessageMock).toHaveBeenCalledWith({
+      type: 'subscribe',
+      collection: 'snehal',
+    })
+  })
+
+  it('resubscribes when the websocket reconnects', async () => {
+    const { default: App } = await import('@/App')
+    const { rerender } = render(<App />)
+
+    sendWebSocketMessageMock.mockClear()
+    isWebSocketConnectedMock = false
+    rerender(<App />)
+    isWebSocketConnectedMock = true
+    rerender(<App />)
+
+    expect(sendWebSocketMessageMock).toHaveBeenCalledWith({
+      type: 'subscribe',
+      collection: 'snehal',
+    })
+  })
+
+  it('does not refetch the collection list for ordinary active-collection file writes', async () => {
+    const { default: App } = await import('@/App')
+    render(<App />)
+
+    capturedWebSocketOptions.current?.onMessage?.({
+      type: 'file_change',
+      collection: 'snehal',
+      data: { relativePath: 'requests/get-users.bru' },
+    })
+
+    expect(fetchCollectionsMock).not.toHaveBeenCalled()
+    expect(fetchCollectionTreeMock).toHaveBeenCalledWith('snehal')
   })
 
   it('clamps sidebar width while dragging the resize handle', async () => {

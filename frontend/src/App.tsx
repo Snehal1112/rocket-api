@@ -8,7 +8,7 @@ import { ConsolePanel } from '@/components/layout/ConsolePanel'
 import { WelcomeScreen } from '@/components/layout/WelcomeScreen'
 import { useConsoleStore } from '@/store/console'
 import { ThemeProvider, useTheme } from 'next-themes'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useWebSocket } from '@/hooks/use-websocket'
 import { useCollectionsStore } from '@/store/collections'
 import { useTabsStore, isRequestTab } from '@/store/tabs-store'
@@ -89,7 +89,7 @@ function App() {
 
   const handleFileChangeMessage = (message: {
     collection?: string
-    data?: { relativePath?: string }
+    data?: { relativePath?: string; type?: string }
   }) => {
     const relativePath = message.data?.relativePath ?? ''
 
@@ -111,14 +111,20 @@ function App() {
       return
     }
 
-    fetchCollections()
+    if (!relativePath.includes('/') && relativePath !== '' && !relativePath.includes('.')) {
+      fetchCollections()
+      return
+    }
+
     if (activeCollection && message.collection === activeCollection.name) {
       useCollectionsStore.getState().fetchCollectionTree(activeCollection.name)
     }
   }
-  
-  // WebSocket for real-time updates
-  useWebSocket(runtimeConfig.wsUrl, {
+
+  const {
+    send: sendWebSocketMessage,
+    isConnected: isWebSocketConnected,
+  } = useWebSocket(runtimeConfig.wsUrl, {
     onMessage: (message) => {
       if (message.type === 'file_change') {
         console.log('File changed:', message)
@@ -132,6 +138,26 @@ function App() {
       console.log('WebSocket disconnected - real-time sync disabled')
     }
   })
+
+  const syncWebSocketSubscription = useCallback(() => {
+    if (!isWebSocketConnected) {
+      return
+    }
+
+    if (activeCollection?.name) {
+      sendWebSocketMessage({
+        type: 'subscribe',
+        collection: activeCollection.name,
+      })
+      return
+    }
+
+    sendWebSocketMessage({ type: 'unsubscribe' })
+  }, [activeCollection?.name, isWebSocketConnected, sendWebSocketMessage])
+
+  useEffect(() => {
+    syncWebSocketSubscription()
+  }, [syncWebSocketSubscription])
 
   // Restore active collection context from the currently active tab after reload.
   useEffect(() => {

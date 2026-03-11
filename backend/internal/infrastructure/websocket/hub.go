@@ -23,6 +23,9 @@ type Client struct {
 	hub  *Hub
 	conn *websocket.Conn
 	send chan []byte
+
+	subscriptionMu sync.RWMutex
+	subscription   string
 }
 
 // Message represents a message to be broadcast
@@ -30,6 +33,11 @@ type Message struct {
 	Type       string      `json:"type"`
 	Collection string      `json:"collection,omitempty"`
 	Data       interface{} `json:"data"`
+}
+
+type ControlMessage struct {
+	Type       string `json:"type"`
+	Collection string `json:"collection,omitempty"`
 }
 
 var upgrader = websocket.Upgrader{
@@ -76,8 +84,12 @@ func (h *Hub) Run() {
 				continue
 			}
 
-			h.mu.RLock()
+			h.mu.Lock()
 			for client := range h.clients {
+				if message.Collection != "" && client.getSubscription() != message.Collection {
+					continue
+				}
+
 				select {
 				case client.send <- data:
 				default:
@@ -86,7 +98,7 @@ func (h *Hub) Run() {
 					delete(h.clients, client)
 				}
 			}
-			h.mu.RUnlock()
+			h.mu.Unlock()
 		}
 	}
 }
@@ -98,6 +110,18 @@ func (h *Hub) Broadcast(msgType string, collection string, data interface{}) {
 		Collection: collection,
 		Data:       data,
 	}
+}
+
+func (c *Client) updateSubscription(collection string) {
+	c.subscriptionMu.Lock()
+	defer c.subscriptionMu.Unlock()
+	c.subscription = collection
+}
+
+func (c *Client) getSubscription() string {
+	c.subscriptionMu.RLock()
+	defer c.subscriptionMu.RUnlock()
+	return c.subscription
 }
 
 // ServeWs handles WebSocket requests from clients
@@ -130,15 +154,25 @@ func (c *Client) readPump() {
 	c.conn.SetReadLimit(512 * 1024) // 512KB max message size
 
 	for {
-		_, _, err := c.conn.ReadMessage()
+		_, payload, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("WebSocket error: %v", err)
 			}
 			break
 		}
-		// We don't process incoming messages from clients for now
-		// Just keep the connection alive
+
+		var msg ControlMessage
+		if err := json.Unmarshal(payload, &msg); err != nil {
+			continue
+		}
+
+		switch msg.Type {
+		case "subscribe":
+			c.updateSubscription(msg.Collection)
+		case "unsubscribe":
+			c.updateSubscription("")
+		}
 	}
 }
 
