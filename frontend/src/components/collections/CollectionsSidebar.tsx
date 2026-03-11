@@ -343,13 +343,15 @@ export function CollectionsSidebar() {
 
   const getMethodColor = (method?: string) => {
     const colors: Record<string, string> = {
-      GET: 'text-emerald-600 dark:text-emerald-400',
-      POST: 'text-amber-600 dark:text-amber-400',
-      PUT: 'text-blue-600 dark:text-blue-400',
-      DELETE: 'text-rose-600 dark:text-rose-400',
-      PATCH: 'text-violet-600 dark:text-violet-400',
+      GET: 'bg-emerald-500/12 text-emerald-700 dark:bg-emerald-500/18 dark:text-emerald-300',
+      POST: 'bg-amber-500/12 text-amber-700 dark:bg-amber-500/18 dark:text-amber-300',
+      PUT: 'bg-blue-500/12 text-blue-700 dark:bg-blue-500/18 dark:text-blue-300',
+      DELETE: 'bg-rose-500/12 text-rose-700 dark:bg-rose-500/18 dark:text-rose-300',
+      PATCH: 'bg-violet-500/12 text-violet-700 dark:bg-violet-500/18 dark:text-violet-300',
+      HEAD: 'bg-slate-500/12 text-slate-700 dark:bg-slate-500/18 dark:text-slate-300',
+      OPTIONS: 'bg-cyan-500/12 text-cyan-700 dark:bg-cyan-500/18 dark:text-cyan-300',
     }
-    return colors[method?.toUpperCase() || 'GET'] || 'text-muted-foreground'
+    return colors[method?.toUpperCase() || 'GET'] || 'bg-muted text-muted-foreground'
   }
 
   const filteredCollections = (collections || []).filter(collection => 
@@ -357,7 +359,7 @@ export function CollectionsSidebar() {
   )
 
   const renderTreeNode = (node: TreeNode, level: number = 0, activeFilePath: string | null = null) => {
-    const paddingLeft = level * 16 + 8
+    const paddingLeft = level * 14 + 10
 
     if (node.type === 'request') {
       const isActiveRequest = activeFilePath !== null && activeFilePath === node.path
@@ -365,16 +367,16 @@ export function CollectionsSidebar() {
       return (
         <div
           key={node.path || node.name}
-          className={`group flex items-center border-l-2 transition-colors hover:bg-accent/40 ${
+          className={`group flex min-h-8 items-center border-l-2 rounded-r-md transition-all ${
             isActiveRequest
-              ? 'border-primary bg-accent/55 text-foreground'
-              : 'border-transparent text-foreground/90'
+              ? 'border-primary bg-accent/70 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
+              : 'border-transparent text-foreground/90 hover:bg-accent/45'
           }`}
-          style={{ paddingLeft: `${paddingLeft + 20}px` }}
+          style={{ paddingLeft: `${paddingLeft + 18}px` }}
         >
           <button
             type="button"
-            className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pr-1 text-left"
+            className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pr-1.5 text-left"
             onClick={() => {
               if (activeCollection && node.path) {
                 loadRequestFromPath(activeCollection.name, node.path)
@@ -382,21 +384,23 @@ export function CollectionsSidebar() {
             }}
           >
             <span
-              className={`w-11 shrink-0 text-left text-[10px] font-semibold uppercase tracking-wide ${getMethodColor(node.method)}`}
+              className={`inline-flex h-5 w-9 shrink-0 items-center justify-center rounded-md border border-black/5 text-[9px] font-semibold uppercase tracking-[0.08em] ${getMethodColor(node.method)}`}
             >
               {(node.method || 'GET').toUpperCase()}
             </span>
-            <span className={`truncate text-xs leading-5 ${isActiveRequest ? 'font-medium' : ''}`}>
+            <span className={`truncate text-xs leading-4 ${isActiveRequest ? 'font-semibold' : 'font-medium'}`}>
               {node.name}
             </span>
           </button>
 
-          <div className="mr-1 flex w-6 shrink-0 justify-center">
+          <div className="mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-5 w-5 rounded opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent"
+                  className={`h-5 w-5 rounded-sm transition-all hover:bg-accent ${
+                    isActiveRequest ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                  }`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
@@ -444,7 +448,7 @@ export function CollectionsSidebar() {
       const isExpanded = expandedFolders.has(folderKey)
       return (
         <div key={node.path || node.name}>
-          <div className="flex items-center group hover:bg-accent/50 transition-colors">
+          <div className="group flex min-h-8 items-center rounded-sm hover:bg-accent/50 transition-colors">
             <Button
               variant="ghost"
               size="sm"
@@ -459,7 +463,7 @@ export function CollectionsSidebar() {
                   return next
                 })
               }}
-              className="flex-1 justify-start gap-1.5 px-2 py-1.5 h-auto hover:bg-transparent"
+              className="h-8 flex-1 justify-start gap-1.5 px-2.5 py-1 text-xs hover:bg-transparent"
               style={{ paddingLeft: `${paddingLeft}px` }}
             >
               {isExpanded ? (
@@ -474,7 +478,7 @@ export function CollectionsSidebar() {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded hover:bg-accent shrink-0 mr-1"
+                  className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
@@ -518,12 +522,12 @@ export function CollectionsSidebar() {
     <TooltipProvider>
     <aside className="w-72 border-r border-border/70 bg-card/80 backdrop-blur-sm flex flex-col shrink-0">
       {/* Sidebar Header */}
-      <div className="h-12 border-b border-border/70 flex items-center px-2 gap-1 bg-card/90">
+      <div className="flex h-11 items-center gap-1.5 border-b border-border/70 bg-card/90 px-2.5">
         <Button 
           variant={activeTab === 'collections' ? 'secondary' : 'ghost'}
           size="sm"
           onClick={() => setActiveTab('collections')}
-          className={`text-xs h-7 px-2.5 gap-1.5 ${activeTab === 'collections' ? 'font-medium' : 'text-muted-foreground'}`}
+          className={`h-7 gap-1.5 px-2.5 text-xs ${activeTab === 'collections' ? 'font-medium' : 'text-muted-foreground'}`}
         >
           <Folder className="h-3.5 w-3.5" />
           Collections
@@ -532,7 +536,7 @@ export function CollectionsSidebar() {
           variant={activeTab === 'history' ? 'secondary' : 'ghost'}
           size="sm"
           onClick={() => setActiveTab('history')}
-          className={`text-xs h-7 px-2.5 gap-1.5 ${activeTab === 'history' ? 'font-medium' : 'text-muted-foreground'}`}
+          className={`h-7 gap-1.5 px-2.5 text-xs ${activeTab === 'history' ? 'font-medium' : 'text-muted-foreground'}`}
         >
           <Clock className="h-3.5 w-3.5" />
           History
@@ -544,7 +548,7 @@ export function CollectionsSidebar() {
               variant="ghost"
               size="icon"
               onClick={handleImportBruno}
-              className="h-6 w-6"
+              className="h-7 w-7"
             >
               <Upload className="h-3.5 w-3.5" />
             </Button>
@@ -557,7 +561,7 @@ export function CollectionsSidebar() {
               variant="ghost"
               size="icon"
               onClick={handleCreateCollection}
-              className="h-6 w-6"
+              className="h-7 w-7"
             >
               <Plus className="h-3.5 w-3.5" />
             </Button>
@@ -567,14 +571,14 @@ export function CollectionsSidebar() {
       </div>
 
       {/* Search */}
-      <div className="p-2 border-b border-border/70 bg-muted/20">
+      <div className="border-b border-border/70 bg-muted/20 px-2.5 py-2">
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder="Filter..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-7 h-7 text-xs"
+            className="h-7 pl-7 text-xs"
           />
         </div>
       </div>
@@ -593,22 +597,22 @@ export function CollectionsSidebar() {
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : activeTab === 'collections' ? (
-          <div className="py-2 px-1">
+          <div className="space-y-1 px-1.5 py-1.5">
             {filteredCollections.map((collection) => {
               const isExpanded = expandedCollectionId === collection.id
               const isActive = activeCollection?.id === collection.id
               
               return (
-                <div key={collection.id}>
+                <div key={collection.id} className="space-y-1">
                   {/* Collection Header */}
                   <div
-                    className={`flex items-center gap-1 rounded-md hover:bg-accent/60 transition-colors group ${
+                    className={`group flex min-h-8 items-center gap-1 rounded-md transition-colors hover:bg-accent/60 ${
                       isActive ? 'bg-accent/70' : ''
                     }`}
                   >
                     <button
                       type="button"
-                      className="flex items-center gap-1 flex-1 min-w-0 px-2 py-2 text-left"
+                      className="flex min-w-0 flex-1 items-center gap-1.5 px-2.5 py-1.5 text-left"
                       onClick={() => {
                         toggleCollection(collection.id)
                         setActiveCollection(collection)
@@ -622,7 +626,7 @@ export function CollectionsSidebar() {
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                         )}
                       </span>
-                      <span className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5">
                         <Database className="h-4 w-4 text-blue-600 shrink-0" />
                         <span className="truncate text-xs font-medium">{collection.name}</span>
                         <span className="text-[10px] text-muted-foreground shrink-0">
@@ -635,14 +639,14 @@ export function CollectionsSidebar() {
                     </button>
 
                     {/* Action icons */}
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pr-1">
+                    <div className="flex w-[76px] shrink-0 items-center justify-end gap-0.5 pr-1 opacity-0 transition-opacity group-hover:opacity-100">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={(e) => e.stopPropagation()}
-                            className="h-6 w-6"
+                            className="h-6 w-6 rounded-sm"
                           >
                             <MoreHorizontal className="h-3 w-3" />
                           </Button>
@@ -672,7 +676,7 @@ export function CollectionsSidebar() {
                             variant="ghost"
                             size="icon"
                             onClick={(e) => { e.stopPropagation(); handleExportBruno(collection.name) }}
-                            className="h-6 w-6"
+                            className="h-6 w-6 rounded-sm"
                           >
                             <Download className="h-3 w-3" />
                           </Button>
@@ -685,7 +689,7 @@ export function CollectionsSidebar() {
                             variant="ghost"
                             size="icon"
                             onClick={(e) => { e.stopPropagation(); handleDeleteCollection(collection.name) }}
-                            className="h-6 w-6 text-destructive hover:text-destructive"
+                            className="h-6 w-6 rounded-sm text-destructive hover:text-destructive"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -697,7 +701,7 @@ export function CollectionsSidebar() {
 
                   {/* Collection Tree */}
                   {isExpanded && isActive && collectionTree?.children && (
-                    <div className="border-l border-border/60 ml-4 mt-1">
+                    <div className="ml-2 border-l border-border/50 pl-1">
                       {collectionTree.children.map(child => renderTreeNode(child, 0, activeTabFilePath))}
                     </div>
                   )}
@@ -735,6 +739,7 @@ export function CollectionsSidebar() {
               </div>
             ) : (
               <div className="space-y-0.5 p-1">
+              <div className="space-y-1 px-1.5 py-1.5">
                 {historyEntries.map((entry) => {
                   const timestamp = new Date(entry.timestamp).toLocaleTimeString([], { 
                     hour: '2-digit', 
@@ -748,7 +753,7 @@ export function CollectionsSidebar() {
                   return (
                     <div
                       key={entry.id}
-                      className="group flex flex-col gap-0.5 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-xs border-l-2 border-transparent hover:border-primary transition-colors"
+                      className="group flex cursor-pointer flex-col gap-0.5 rounded-sm border-l-2 border-transparent px-2.5 py-1.5 text-xs transition-colors hover:border-primary hover:bg-accent"
                       onClick={() => {
                         // Load the history entry into the active tab.
                         loadRequestInActiveTab({
@@ -809,6 +814,7 @@ export function CollectionsSidebar() {
                     </div>
                   )
                 })}
+              </div>
               </div>
             )}
           </div>
