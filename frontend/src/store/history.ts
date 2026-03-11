@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { HistoryEntry } from '@/types'
+import { apiService } from '@/lib/api'
 
 interface HistoryState {
   entries: HistoryEntry[]
@@ -22,17 +23,26 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
   selectedEntry: null,
 
   fetchHistory: async (limit = 50) => {
+    const existingRequest = fetchHistoryInFlight.get(limit)
+    if (existingRequest) {
+      await existingRequest
+      return
+    }
+
     set({ isLoading: true, error: null })
-    
+    const request = apiService.getHistory(limit)
+    fetchHistoryInFlight.set(limit, request)
+
     try {
-      const { apiService } = await import('@/lib/api')
-      const entries = await apiService.getHistory(limit)
+      const entries = await request
       set({ entries, isLoading: false })
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to fetch history',
         isLoading: false
       })
+    } finally {
+      fetchHistoryInFlight.delete(limit)
     }
   },
 
@@ -42,7 +52,6 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
 
   deleteEntry: async (id) => {
     try {
-      const { apiService } = await import('@/lib/api')
       await apiService.deleteHistoryEntry(id)
       
       // Refresh the list
@@ -57,7 +66,6 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
 
   clearHistory: async () => {
     try {
-      const { apiService } = await import('@/lib/api')
       await apiService.clearHistory()
       set({ entries: [], selectedEntry: null })
     } catch (error) {
@@ -72,3 +80,5 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
     console.log('Loading history entry:', entry)
   }
 }))
+
+const fetchHistoryInFlight = new Map<number, Promise<HistoryEntry[]>>()

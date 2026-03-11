@@ -56,7 +56,6 @@ function ThemeToggle() {
 function App() {
   const {
     fetchCollections,
-    fetchCollectionTree,
     activeCollection,
     collections,
     setActiveCollection,
@@ -64,18 +63,43 @@ function App() {
   const tabs = useTabsStore(state => state.tabs)
   const activeTabId = useTabsStore(state => state.activeTabId)
   const activeTab = tabs.find(t => t.id === activeTabId)
+
+  const handleFileChangeMessage = (message: {
+    collection?: string
+    data?: { relativePath?: string }
+  }) => {
+    const relativePath = message.data?.relativePath ?? ''
+
+    if (relativePath.startsWith('environments/')) {
+      if (activeCollection && message.collection === activeCollection.name) {
+        useCollectionsStore.getState().fetchEnvironments(activeCollection.name)
+      }
+      return
+    }
+
+    if (relativePath === 'collection.bru') {
+      if (activeCollection && message.collection === activeCollection.name) {
+        const store = useCollectionsStore.getState()
+        if (store.consumeCollectionVariablesSelfEcho(activeCollection.name, relativePath)) {
+          return
+        }
+        store.fetchCollectionVariables(activeCollection.name)
+      }
+      return
+    }
+
+    fetchCollections()
+    if (activeCollection && message.collection === activeCollection.name) {
+      useCollectionsStore.getState().fetchCollectionTree(activeCollection.name)
+    }
+  }
   
   // WebSocket for real-time updates
   useWebSocket(runtimeConfig.wsUrl, {
     onMessage: (message) => {
       if (message.type === 'file_change') {
         console.log('File changed:', message)
-        // Refresh collections
-        fetchCollections()
-        // Refresh active collection tree if it's the one that changed
-        if (activeCollection && message.collection === activeCollection.name) {
-          fetchCollectionTree(activeCollection.name)
-        }
+        handleFileChangeMessage(message as { collection?: string; data?: { relativePath?: string } })
       }
     },
     onConnect: () => {
@@ -86,7 +110,7 @@ function App() {
     }
   })
 
-  // Restore active collection/tree context from the currently active tab after reload.
+  // Restore active collection context from the currently active tab after reload.
   useEffect(() => {
     if (!activeTab || collections.length === 0) return
 
@@ -98,15 +122,11 @@ function App() {
 
     if (activeCollection?.name !== targetCollection.name) {
       setActiveCollection(targetCollection)
-      return
     }
-
-    fetchCollectionTree(targetCollection.name)
   }, [
     activeTab,
     activeCollection?.name,
     collections,
-    fetchCollectionTree,
     setActiveCollection,
   ])
 

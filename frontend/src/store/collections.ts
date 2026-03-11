@@ -11,6 +11,7 @@ interface CollectionsState {
   collectionVariables: CollectionVar[]
   fetchCollectionVariables: (name: string) => Promise<void>
   saveCollectionVariables: (name: string, vars: CollectionVar[]) => Promise<void>
+  consumeCollectionVariablesSelfEcho: (name: string, relativePath?: string) => boolean
   isCollectionsLoading: boolean
   isCollectionTreeLoading: boolean
   error: string | null
@@ -38,7 +39,12 @@ interface CollectionsState {
 }
 
 let fetchCollectionsInFlight: Promise<CollectionSummary[]> | null = null
+const fetchCollectionTreeInFlight: Map<string, Promise<CollectionNode>> = new Map()
+const fetchEnvironmentsInFlight: Map<string, Promise<Environment[]>> = new Map()
+const fetchCollectionVariablesInFlight: Map<string, Promise<CollectionVar[]>> = new Map()
+const collectionVariablesSelfEchoMarkers = new Map<string, number>()
 const ACTIVE_COLLECTION_STORAGE_KEY = 'rocket-api:active-collection'
+const COLLECTION_VARIABLES_SELF_ECHO_WINDOW_MS = 2_000
 
 export const useCollectionsStore = create<CollectionsState>((set, get) => ({
   collections: [],
@@ -82,15 +88,25 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
   },
   
   fetchCollectionTree: async (name: string) => {
+    const existingRequest = fetchCollectionTreeInFlight.get(name)
+    if (existingRequest) {
+      await existingRequest
+      return
+    }
+
     set({ isCollectionTreeLoading: true, error: null })
+    const request = apiService.getCollection(name)
+    fetchCollectionTreeInFlight.set(name, request)
     try {
-      const tree = await apiService.getCollection(name)
+      const tree = await request
       set({ collectionTree: tree, isCollectionTreeLoading: false })
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch collection tree',
         isCollectionTreeLoading: false 
       })
+    } finally {
+      fetchCollectionTreeInFlight.delete(name)
     }
   },
   
@@ -132,6 +148,11 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
   },
   
   setActiveCollection: (collection: CollectionSummary | null) => {
+    const current = get().activeCollection
+    if (current?.name === collection?.name) {
+      return
+    }
+
     set({ activeCollection: collection, activeEnvironment: null, collectionVariables: [] })
     if (collection) {
       localStorage.setItem(ACTIVE_COLLECTION_STORAGE_KEY, collection.name)
@@ -152,20 +173,33 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
   },
   
   fetchEnvironments: async (collection: string) => {
-    try {
+    const existingRequest = fetchEnvironmentsInFlight.get(collection)
+    if (existingRequest) {
+      await existingRequest
+      return
+    }
+
+    const request = (async () => {
       const envNames = await apiService.getEnvironments(collection)
       const results = await Promise.allSettled(
         envNames.map(name => apiService.getEnvironment(collection, name))
       )
-      const envs = results
+      return results
         .filter(
           (result): result is PromiseFulfilledResult<Environment> =>
             result.status === 'fulfilled'
         )
         .map(result => result.value)
+    })()
+    fetchEnvironmentsInFlight.set(collection, request)
+
+    try {
+      const envs = await request
       set({ environments: envs })
     } catch (error) {
       console.error('Failed to fetch environments:', error)
+    } finally {
+      fetchEnvironmentsInFlight.delete(collection)
     }
   },
   
@@ -191,12 +225,20 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
 
   saveEnvironment: async (collectionName: string, env: Environment) => {
     await apiService.saveEnvironment(collectionName, env)
-    await get().fetchEnvironments(collectionName)
-    // Keep activeEnvironment in sync with the refreshed list.
-    if (get().activeEnvironment?.name === env.name) {
-      const updated = get().environments.find(e => e.name === env.name) ?? null
-      set({ activeEnvironment: updated })
-    }
+    set((state) => {
+      const existingIndex = state.environments.findIndex(e => e.name === env.name)
+      const environments =
+        existingIndex >= 0
+          ? state.environments.map(existing => (existing.name === env.name ? env : existing))
+          : [...state.environments, env]
+      const activeEnvironment =
+        state.activeEnvironment?.name === env.name ? env : state.activeEnvironment
+
+      return {
+        environments,
+        activeEnvironment,
+      }
+    })
   },
 
   deleteEnvironment: async (collectionName: string, name: string) => {
@@ -208,17 +250,44 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
   },
 
   fetchCollectionVariables: async (name: string) => {
+    const existingRequest = fetchCollectionVariablesInFlight.get(name)
+    if (existingRequest) {
+      await existingRequest
+      return
+    }
+
+    const request = apiService.getCollectionVariables(name)
+    fetchCollectionVariablesInFlight.set(name, request)
     try {
-      const vars = await apiService.getCollectionVariables(name)
+      const vars = await request
       set({ collectionVariables: vars })
     } catch (error) {
       console.error('Failed to fetch collection variables:', error)
+    } finally {
+      fetchCollectionVariablesInFlight.delete(name)
     }
   },
 
   saveCollectionVariables: async (name: string, vars: CollectionVar[]) => {
     await apiService.saveCollectionVariables(name, vars)
+    collectionVariablesSelfEchoMarkers.set(name, Date.now())
     set({ collectionVariables: vars })
+  },
+
+  consumeCollectionVariablesSelfEcho: (name: string, relativePath?: string) => {
+    if (relativePath !== 'collection.bru') {
+      return false
+    }
+
+    const markedAt = collectionVariablesSelfEchoMarkers.get(name)
+    if (!markedAt) {
+      return false
+    }
+
+    const isFresh =
+      Date.now() - markedAt <= COLLECTION_VARIABLES_SELF_ECHO_WINDOW_MS
+    collectionVariablesSelfEchoMarkers.delete(name)
+    return isFresh
   },
 
   importBruno: async (file: File, name?: string) => {

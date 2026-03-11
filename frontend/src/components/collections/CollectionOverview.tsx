@@ -34,7 +34,6 @@ export function CollectionOverview({ collectionName }: CollectionOverviewProps) 
     environments,
     activeCollection,
     setActiveCollection,
-    fetchCollectionTree,
     exportBruno,
     exportPostman,
   } = useCollectionsStore()
@@ -53,11 +52,6 @@ export function CollectionOverview({ collectionName }: CollectionOverviewProps) 
       setActiveCollection(collectionSummary)
     }
   }, [collectionName, collectionSummary, activeCollection?.name, setActiveCollection])
-
-  // Fetch collection tree when collection name changes
-  useEffect(() => {
-    fetchCollectionTree(collectionName)
-  }, [collectionName, fetchCollectionTree])
 
   // Fetch history for activity section
   useEffect(() => {

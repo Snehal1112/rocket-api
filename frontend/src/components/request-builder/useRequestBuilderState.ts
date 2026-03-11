@@ -28,6 +28,80 @@ interface AlertDialogState {
   description: string
 }
 
+function applyScriptVariableUpdates(
+  activeEnvironment: ReturnType<typeof useCollectionsStore.getState>['activeEnvironment'],
+  collectionVariables: ReturnType<typeof useCollectionsStore.getState>['collectionVariables'],
+  scriptVars: Record<string, string>
+) {
+  const nextEnvironment = activeEnvironment
+    ? {
+        ...activeEnvironment,
+        variables: activeEnvironment.variables.map(variable => ({ ...variable })),
+      }
+    : null
+  const nextCollectionVariables = collectionVariables.map(variable => ({ ...variable }))
+
+  let environmentChanged = false
+  let collectionChanged = false
+
+  for (const [key, value] of Object.entries(scriptVars)) {
+    const envIndex =
+      nextEnvironment?.variables.findIndex(variable => variable.key === key) ?? -1
+    if (nextEnvironment && envIndex >= 0) {
+      const current = nextEnvironment.variables[envIndex]
+      if (current.value !== value || !current.enabled) {
+        nextEnvironment.variables[envIndex] = {
+          ...current,
+          value,
+          enabled: true,
+        }
+        environmentChanged = true
+      }
+      continue
+    }
+
+    const collectionIndex = nextCollectionVariables.findIndex(variable => variable.key === key)
+    if (collectionIndex >= 0) {
+      const current = nextCollectionVariables[collectionIndex]
+      if (current.value !== value || !current.enabled) {
+        nextCollectionVariables[collectionIndex] = {
+          ...current,
+          value,
+          enabled: true,
+        }
+        collectionChanged = true
+      }
+      continue
+    }
+
+    if (nextEnvironment) {
+      nextEnvironment.variables.push({
+        key,
+        value,
+        enabled: true,
+        secret: false,
+      })
+      environmentChanged = true
+      continue
+    }
+
+    nextCollectionVariables.push({
+      key,
+      value,
+      enabled: true,
+      secret: false,
+    })
+    collectionChanged = true
+  }
+
+  return {
+    nextEnvironment,
+    nextCollectionVariables,
+    environmentChanged,
+    collectionChanged,
+  }
+}
+
 export function useRequestBuilderState({ onRequestSent }: RequestBuilderStateOptions) {
   const [requestHeight, setRequestHeight] = useState(50)
   const [isDragging, setIsDragging] = useState(false)
@@ -176,6 +250,53 @@ export function useRequestBuilderState({ onRequestSent }: RequestBuilderStateOpt
     saveActiveTab,
   ])
 
+  const handleSaveUrlVariable = useCallback(async (name: string, nextValue: string) => {
+    const { activeCollection, activeEnvironment, collectionVariables } = useCollectionsStore.getState()
+    if (!activeCollection) return
+
+    const envMatch = activeEnvironment?.variables.find(v => v.key === name)
+    if (activeEnvironment && envMatch) {
+      const updatedEnv = {
+        ...activeEnvironment,
+        variables: activeEnvironment.variables.map(v =>
+          v.key === name ? { ...v, value: nextValue, enabled: true } : v
+        ),
+      }
+      // saveEnvironment fetches fresh data and syncs activeEnvironment internally
+      await useCollectionsStore.getState().saveEnvironment(activeCollection.name, updatedEnv)
+      return
+    }
+
+    const collectionMatch = collectionVariables.find(v => v.key === name)
+    if (collectionMatch) {
+      const updatedCollectionVars = collectionVariables.map(v =>
+        v.key === name ? { ...v, value: nextValue, enabled: true } : v
+      )
+      await useCollectionsStore.getState().saveCollectionVariables(activeCollection.name, updatedCollectionVars)
+      return
+    }
+
+    if (activeEnvironment) {
+      const updatedEnv = {
+        ...activeEnvironment,
+        variables: [
+          ...activeEnvironment.variables,
+          { key: name, value: nextValue, enabled: true, secret: false },
+        ],
+      }
+      // saveEnvironment fetches fresh data and syncs activeEnvironment internally
+      await useCollectionsStore.getState().saveEnvironment(activeCollection.name, updatedEnv)
+      return
+    }
+
+    await useCollectionsStore
+      .getState()
+      .saveCollectionVariables(activeCollection.name, [
+        ...collectionVariables,
+        { key: name, value: nextValue, enabled: true, secret: false },
+      ])
+  }, [])
+
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (!url.trim()) return
@@ -278,8 +399,29 @@ export function useRequestBuilderState({ onRequestSent }: RequestBuilderStateOpt
         ...(httpResponse.preScriptResult?.variables ?? {}),
         ...(httpResponse.scriptResult?.variables ?? {}),
       }
-      for (const [key, value] of Object.entries(scriptVars)) {
-        await handleSaveUrlVariable(key, value)
+      const latestStore = useCollectionsStore.getState()
+      if (latestStore.activeCollection && Object.keys(scriptVars).length > 0) {
+        const {
+          nextEnvironment,
+          nextCollectionVariables,
+          environmentChanged,
+          collectionChanged,
+        } = applyScriptVariableUpdates(
+          latestStore.activeEnvironment,
+          latestStore.collectionVariables,
+          scriptVars
+        )
+
+        if (environmentChanged && nextEnvironment) {
+          await latestStore.saveEnvironment(latestStore.activeCollection.name, nextEnvironment)
+        }
+
+        if (collectionChanged) {
+          await latestStore.saveCollectionVariables(
+            latestStore.activeCollection.name,
+            nextCollectionVariables
+          )
+        }
       }
 
       if (onRequestSent) onRequestSent(request, httpResponse)
@@ -397,53 +539,6 @@ export function useRequestBuilderState({ onRequestSent }: RequestBuilderStateOpt
     }
     reader.readAsDataURL(file)
   }
-
-  const handleSaveUrlVariable = useCallback(async (name: string, nextValue: string) => {
-    const { activeCollection, activeEnvironment, collectionVariables } = useCollectionsStore.getState()
-    if (!activeCollection) return
-
-    const envMatch = activeEnvironment?.variables.find(v => v.key === name)
-    if (activeEnvironment && envMatch) {
-      const updatedEnv = {
-        ...activeEnvironment,
-        variables: activeEnvironment.variables.map(v =>
-          v.key === name ? { ...v, value: nextValue, enabled: true } : v
-        ),
-      }
-      // saveEnvironment fetches fresh data and syncs activeEnvironment internally
-      await useCollectionsStore.getState().saveEnvironment(activeCollection.name, updatedEnv)
-      return
-    }
-
-    const collectionMatch = collectionVariables.find(v => v.key === name)
-    if (collectionMatch) {
-      const updatedCollectionVars = collectionVariables.map(v =>
-        v.key === name ? { ...v, value: nextValue, enabled: true } : v
-      )
-      await useCollectionsStore.getState().saveCollectionVariables(activeCollection.name, updatedCollectionVars)
-      return
-    }
-
-    if (activeEnvironment) {
-      const updatedEnv = {
-        ...activeEnvironment,
-        variables: [
-          ...activeEnvironment.variables,
-          { key: name, value: nextValue, enabled: true, secret: false },
-        ],
-      }
-      // saveEnvironment fetches fresh data and syncs activeEnvironment internally
-      await useCollectionsStore.getState().saveEnvironment(activeCollection.name, updatedEnv)
-      return
-    }
-
-    await useCollectionsStore
-      .getState()
-      .saveCollectionVariables(activeCollection.name, [
-        ...collectionVariables,
-        { key: name, value: nextValue, enabled: true, secret: false },
-      ])
-  }, [])
 
   return {
     containerRef,
