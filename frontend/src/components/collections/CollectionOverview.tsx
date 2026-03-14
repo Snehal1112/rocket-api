@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CollectionVariablesEditor } from './CollectionVariablesEditor'
+import { CollectionRunnerDialog } from './CollectionRunnerDialog'
 import {
   FolderOpen,
   FileText,
@@ -45,6 +46,7 @@ export function CollectionOverview({ collectionName }: CollectionOverviewProps) 
   const [description, setDescription] = useState('')
   const [isEditingDescription, setIsEditingDescription] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [runnerOpen, setRunnerOpen] = useState(false)
 
   const collectionSummary = collections.find(c => c.name === collectionName)
 
@@ -347,8 +349,7 @@ export function CollectionOverview({ collectionName }: CollectionOverviewProps) 
                           variant="outline"
                           size="sm"
                           className="w-full justify-start text-xs h-8"
-                          disabled
-                          title="Coming soon"
+                          onClick={() => setRunnerOpen(true)}
                         >
                           <Play className="h-3.5 w-3.5 mr-2" />
                           Run All
@@ -402,6 +403,13 @@ export function CollectionOverview({ collectionName }: CollectionOverviewProps) 
           </ScrollArea>
         </TabsContent>
       </Tabs>
+
+      <CollectionRunnerDialog
+        open={runnerOpen}
+        onOpenChange={setRunnerOpen}
+        collectionName={collectionName}
+        collectionTree={collectionTree}
+      />
     </div>
   )
 }
