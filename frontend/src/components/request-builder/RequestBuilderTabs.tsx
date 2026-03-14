@@ -107,6 +107,7 @@ export function RequestBuilderTabs({
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label={`${param.enabled ? 'Disable' : 'Enable'} path param ${param.key || index + 1}`}
                   onClick={() => updatePathParam(index, 'enabled', !param.enabled)}
                   className={`w-4 h-4 rounded border p-0 ${
                     param.enabled ? 'bg-primary border-primary text-primary-foreground hover:bg-primary/90' : 'border-gray-300 hover:bg-muted'
@@ -116,12 +117,14 @@ export function RequestBuilderTabs({
                 </Button>
                 <Input
                   placeholder="Path Key (e.g. customerId)"
+                  aria-label={`Path param key ${index + 1}`}
                   value={param.key}
                   onChange={(e) => updatePathParam(index, 'key', e.target.value)}
                   className="flex-1 text-xs h-8"
                 />
                 <Input
                   placeholder="Value"
+                  aria-label={`Path param value ${index + 1}`}
                   value={param.value}
                   onChange={(e) => updatePathParam(index, 'value', e.target.value)}
                   className="flex-1 text-xs h-8"
@@ -147,6 +150,7 @@ export function RequestBuilderTabs({
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label={`${param.enabled ? 'Disable' : 'Enable'} query param ${param.key || index + 1}`}
                   onClick={() => updateQueryParam(index, 'enabled', !param.enabled)}
                   className={`w-4 h-4 rounded border p-0 ${
                     param.enabled ? 'bg-primary border-primary text-primary-foreground hover:bg-primary/90' : 'border-gray-300 hover:bg-muted'
@@ -156,12 +160,14 @@ export function RequestBuilderTabs({
                 </Button>
                 <Input
                   placeholder="Key"
+                  aria-label={`Query param key ${index + 1}`}
                   value={param.key}
                   onChange={(e) => updateQueryParam(index, 'key', e.target.value)}
                   className="flex-1 text-xs h-8"
                 />
                 <Input
                   placeholder="Value"
+                  aria-label={`Query param value ${index + 1}`}
                   value={param.value}
                   onChange={(e) => updateQueryParam(index, 'value', e.target.value)}
                   className="flex-1 text-xs h-8"
@@ -190,6 +196,7 @@ export function RequestBuilderTabs({
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label={`${header.enabled ? 'Disable' : 'Enable'} header ${header.key || index + 1}`}
                   onClick={() => updateHeader(index, 'enabled', !header.enabled)}
                   className={`w-4 h-4 rounded border p-0 ${
                     header.enabled ? 'bg-primary border-primary text-primary-foreground hover:bg-primary/90' : 'border-gray-300 hover:bg-muted'
@@ -199,12 +206,14 @@ export function RequestBuilderTabs({
                 </Button>
                 <Input
                   placeholder="Key"
+                  aria-label={`Header key ${index + 1}`}
                   value={header.key}
                   onChange={(e) => updateHeader(index, 'key', e.target.value)}
                   className="flex-1 text-xs h-8"
                 />
                 <Input
                   placeholder="Value"
+                  aria-label={`Header value ${index + 1}`}
                   value={header.value}
                   onChange={(e) => updateHeader(index, 'value', e.target.value)}
                   className="flex-1 text-xs h-8"
@@ -280,6 +289,7 @@ export function RequestBuilderTabs({
                 {body.formData?.map((field, index) => (
                   <div key={index} className="flex gap-2 items-center">
                     <button
+                      aria-label={`${field.enabled ? 'Disable' : 'Enable'} form field ${field.key || index + 1}`}
                       onClick={() => updateFormDataField(index, 'enabled', !field.enabled)}
                       className={`w-4 h-4 rounded border flex items-center justify-center ${
                         field.enabled ? 'bg-primary border-primary text-primary-foreground' : 'border-gray-300'
@@ -289,6 +299,7 @@ export function RequestBuilderTabs({
                     </button>
                     <Input
                       placeholder="Key"
+                      aria-label={`Form data key ${index + 1}`}
                       value={field.key}
                       onChange={(e) => updateFormDataField(index, 'key', e.target.value)}
                       className="flex-1 text-xs h-8"
@@ -296,6 +307,7 @@ export function RequestBuilderTabs({
                     {field.type === 'text' ? (
                       <Input
                         placeholder="Value"
+                        aria-label={`Form data value ${index + 1}`}
                         value={field.value}
                         onChange={(e) => updateFormDataField(index, 'value', e.target.value)}
                         className="flex-1 text-xs h-8"
@@ -395,6 +407,7 @@ export function RequestBuilderTabs({
                   <User className="h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Username"
+                    aria-label="Basic auth username"
                     value={auth.basic?.username || ''}
                     onChange={(e) => setAuth({
                       type: 'basic',
@@ -408,6 +421,7 @@ export function RequestBuilderTabs({
                   <Input
                     type="password"
                     placeholder="Password"
+                    aria-label="Basic auth password"
                     value={auth.basic?.password || ''}
                     onChange={(e) => setAuth({
                       type: 'basic',
@@ -425,6 +439,7 @@ export function RequestBuilderTabs({
                   <Key className="h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Token"
+                    aria-label="Bearer token"
                     value={auth.bearer?.token || ''}
                     onChange={(e) => setAuth({ type: 'bearer', bearer: { token: e.target.value } })}
                     className="flex-1 text-xs h-8"
@@ -437,6 +452,7 @@ export function RequestBuilderTabs({
               <div className="space-y-2">
                 <Input
                   placeholder="Key"
+                  aria-label="API key name"
                   value={auth.apiKey?.key || ''}
                   onChange={(e) => setAuth({
                     type: 'api-key',
@@ -451,6 +467,7 @@ export function RequestBuilderTabs({
                 />
                 <Input
                   placeholder="Value"
+                  aria-label="API key value"
                   value={auth.apiKey?.value || ''}
                   onChange={(e) => setAuth({
                     type: 'api-key',
