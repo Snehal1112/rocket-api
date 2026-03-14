@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { HttpRequest, HttpResponse, QueryParam } from '@/types'
 import { useCollectionsStore } from '@/store/collections'
 import { EnvironmentsDialog } from '@/components/collections/EnvironmentsDialog'
+import { CodeSnippetDialog } from '@/components/request-builder/CodeSnippetDialog'
 import { RequestBuilderTabs } from '@/components/request-builder/RequestBuilderTabs'
 import { RequestBuilderResponsePanel } from '@/components/request-builder/RequestBuilderResponsePanel'
 import { RequestBuilderToolbar } from '@/components/request-builder/RequestBuilderToolbar'
@@ -20,6 +22,7 @@ interface RequestBuilderProps {
 }
 
 export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
+  const [codeSnippetOpen, setCodeSnippetOpen] = useState(false)
   const {
     containerRef,
     requestHeight,
@@ -136,6 +139,7 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
               })
             }
           }}
+          onGenerateCode={() => setCodeSnippetOpen(true)}
           onImportCurl={async (command) => {
             try {
               await handleImportCurl(command)
@@ -205,6 +209,12 @@ export function RequestBuilder({ onRequestSent }: RequestBuilderProps) {
       </AlertDialog>
 
       <EnvironmentsDialog open={envDialogOpen} onOpenChange={setEnvDialogOpen} />
+
+      <CodeSnippetDialog
+        open={codeSnippetOpen}
+        onOpenChange={setCodeSnippetOpen}
+        request={{ method, url, headers, queryParams, body, auth }}
+      />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useCollections } from '@/features/collections/hooks/useCollections'
@@ -7,6 +7,7 @@ import { useHistoryEntries } from '@/features/history/hooks/useHistoryEntries'
 import { useTabsStore } from '@/store/tabs-store'
 import { useFlatTree } from '@/hooks/use-flat-tree'
 import type { FlatTreeNode } from '@/hooks/use-flat-tree'
+import { useTreeKeyboard } from '@/hooks/use-tree-keyboard'
 import { BruFile } from '@/types'
 import { apiService, type CollectionNode } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -146,7 +147,6 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
     if (!activeTabCollectionName) return
     const matchingCollection = collections.find(c => c.name === activeTabCollectionName)
     if (!matchingCollection) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setExpandedCollectionId(prev =>
       prev === matchingCollection.id ? prev : matchingCollection.id
     )
@@ -180,7 +180,6 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
     const folderAncestors = findFolderAncestors(collectionTree.children, activeTabFilePath, [])
     if (!folderAncestors) return
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setExpandedPaths(prev => {
       let changed = false
       const next = new Set(prev)
@@ -368,7 +367,41 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
     overscan: 10,
   })
 
-  const renderFlatRow = (flatNode: FlatTreeNode) => {
+  const toggleExpand = useCallback((path: string) => {
+    setExpandedPaths(prev => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }, [])
+
+  const handleActivate = useCallback((node: CollectionNode) => {
+    if (node.type === 'folder') {
+      toggleExpand(node.path || node.name)
+    } else if (node.type === 'request' && activeCollection && node.path) {
+      loadRequestFromPath(activeCollection.name, node.path)
+    }
+  }, [toggleExpand, activeCollection, loadRequestFromPath])
+
+  const { onKeyDown: treeOnKeyDown, focusedIndex, setFocusedIndex, focusedItemRef } = useTreeKeyboard({
+    flatTree,
+    toggleExpand,
+    onActivate: handleActivate,
+    virtualizer,
+  })
+
+  const renderFlatRow = (flatNode: FlatTreeNode, index: number) => {
+    const ariaProps = {
+      role: 'treeitem' as const,
+      'aria-level': flatNode.depth + 1,
+      'aria-expanded': flatNode.isFolder ? flatNode.isExpanded : undefined,
+      'aria-selected': activeTabFilePath !== null && activeTabFilePath === flatNode.node.path,
+      'aria-setsize': flatNode.siblingCount,
+      'aria-posinset': flatNode.positionInSet,
+      tabIndex: index === focusedIndex ? 0 : -1,
+      ref: index === focusedIndex ? focusedItemRef : undefined,
+    }
     const { node, depth, isExpanded } = flatNode
 
     if (node.type === 'request') {
@@ -377,12 +410,14 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
 
       return (
         <div
+          {...ariaProps}
           className={`group flex min-h-8 items-center border-l-2 rounded-r-md transition-all ${
             isActiveRequest
               ? 'border-primary bg-accent/70 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
               : 'border-transparent text-foreground/90 hover:bg-accent/45'
           }`}
           style={{ paddingLeft: `${paddingLeft}px` }}
+          onClick={() => setFocusedIndex(index)}
         >
           <button
             type="button"
@@ -458,21 +493,11 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
       const paddingLeft = 12 + depth * 16
 
       return (
-        <div className="group flex min-h-8 items-center rounded-sm hover:bg-accent/50 transition-colors">
+        <div {...ariaProps} className="group flex min-h-8 items-center rounded-sm hover:bg-accent/50 transition-colors" onClick={() => setFocusedIndex(index)}>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => {
-              setExpandedPaths(prev => {
-                const next = new Set(prev)
-                if (next.has(folderKey)) {
-                  next.delete(folderKey)
-                } else {
-                  next.add(folderKey)
-                }
-                return next
-              })
-            }}
+            onClick={() => toggleExpand(folderKey)}
             className="h-8 flex-1 justify-start gap-1.5 px-2.5 py-1 text-xs hover:bg-transparent"
             style={{ paddingLeft: `${paddingLeft}px` }}
           >
@@ -729,8 +754,11 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
                   )}
                   {isExpanded && isActive && flatTree.length > 0 && (
                     <div
+                      role="tree"
+                      aria-label="Collection tree"
                       className="ml-2 border-l border-border/50 pl-1"
                       style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}
+                      onKeyDown={treeOnKeyDown}
                     >
                       {virtualizer.getVirtualItems().map(virtualItem => (
                         <div
@@ -744,7 +772,7 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
                             transform: `translateY(${virtualItem.start}px)`,
                           }}
                         >
-                          {renderFlatRow(flatTree[virtualItem.index])}
+                          {renderFlatRow(flatTree[virtualItem.index], virtualItem.index)}
                         </div>
                       ))}
                     </div>

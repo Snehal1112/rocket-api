@@ -365,7 +365,6 @@ export function useRequestBuilderState({ onRequestSent }: RequestBuilderStateOpt
     body,
     auth,
     scripts,
-    onRequestSent,
     updateActiveMethod,
     updateActiveUrl,
     updateActiveHeaders,

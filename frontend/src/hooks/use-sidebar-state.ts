@@ -60,13 +60,6 @@ export function useSidebarState(): SidebarState {
     window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth))
   }, [sidebarWidth])
 
-  // Close overlay when sidebar expands (e.g. via toggle or screen resize to wide)
-  useEffect(() => {
-    if (!isCollapsed && isOverlayOpen) {
-      setIsOverlayOpen(false)
-    }
-  }, [isCollapsed]) // eslint-disable-line react-hooks/exhaustive-deps
-
   // Pointer resize logic
   useEffect(() => {
     if (!isSidebarResizing) return
@@ -109,7 +102,7 @@ export function useSidebarState(): SidebarState {
 
   return {
     isCollapsed,
-    isOverlayOpen,
+    isOverlayOpen: isCollapsed && isOverlayOpen,
     overlayTab,
     sidebarWidth,
     isSidebarResizing,
