@@ -593,8 +593,8 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
 
       {/* Error Message */}
       {error && (
-        <div className="px-3 py-2 bg-red-50 border-b border-red-200">
-          <p className="text-xs text-red-600">{error}</p>
+        <div role="alert" className="px-3 py-2 bg-red-50 border-b border-red-200 dark:bg-red-950/30 dark:border-red-900">
+          <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
         </div>
       )}
 

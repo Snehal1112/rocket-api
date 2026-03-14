@@ -133,6 +133,12 @@ export function WorkspaceShell() {
         data-testid="workspace-shell"
         className="h-screen flex flex-col bg-gradient-to-br from-background via-background to-accent/25 text-sm"
       >
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:text-sm focus:font-medium focus:shadow-lg"
+        >
+          Skip to main content
+        </a>
         <header className="h-14 border-b border-border/70 flex items-center px-4 bg-card/70 backdrop-blur-md shrink-0">
           <div className="flex items-center gap-2.5">
             <img
@@ -167,7 +173,7 @@ export function WorkspaceShell() {
             }`}
           />
 
-          <main className="flex-1 flex flex-col min-w-0 bg-transparent">
+          <main id="main-content" className="flex-1 flex flex-col min-w-0 bg-transparent">
             <RequestTabs />
             <div className="hidden">
               <Outlet />
