@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { useCollections } from '@/features/collections/hooks/useCollections'
 import { useCollectionTree } from '@/features/collections/hooks/useCollectionTree'
 import { useHistoryEntries } from '@/features/history/hooks/useHistoryEntries'
 import { useTabsStore } from '@/store/tabs-store'
+import { useFlatTree } from '@/hooks/use-flat-tree'
+import type { FlatTreeNode } from '@/hooks/use-flat-tree'
 import { BruFile } from '@/types'
-import { apiService } from '@/lib/api'
+import { apiService, type CollectionNode } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -48,21 +51,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 
-interface TreeNode {
-  name: string
-  type: 'collection' | 'folder' | 'request' | 'environment' | 'file'
-  path?: string
-  method?: string
-  children?: TreeNode[]
-}
-
 interface CollectionsSidebarProps {
   initialTab?: 'collections' | 'history'
 }
 
 export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {}) {
   const [expandedCollectionId, setExpandedCollectionId] = useState<string | null>(null)
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
+  const scrollRef = useRef<HTMLDivElement>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState<'collections' | 'history'>(initialTab ?? 'collections')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -89,7 +85,7 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
   }>({ isOpen: false, title: '', description: '', onConfirm: () => {} })
   
   // Rename dialog state
-  const [renameDialog, setRenameDialog] = useState<{ isOpen: boolean; node: TreeNode | null }>({
+  const [renameDialog, setRenameDialog] = useState<{ isOpen: boolean; node: CollectionNode | null }>({
     isOpen: false,
     node: null,
   })
@@ -162,7 +158,7 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
     if (!activeTabCollectionName || activeCollection?.name !== activeTabCollectionName) return
 
     const findFolderAncestors = (
-      nodes: TreeNode[],
+      nodes: CollectionNode[],
       requestPath: string,
       parentFolders: string[]
     ): string[] | null => {
@@ -185,7 +181,7 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
     if (!folderAncestors) return
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setExpandedFolders(prev => {
+    setExpandedPaths(prev => {
       let changed = false
       const next = new Set(prev)
       for (const folder of folderAncestors) {
@@ -207,7 +203,7 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
     setExpandedCollectionId(prev => {
       if (prev === id) return null
       // Switching to a different collection — clear folder state.
-      setExpandedFolders(new Set())
+      setExpandedPaths(new Set())
       return id
     })
   }
@@ -261,7 +257,7 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
       foldersToExpand.push(folderParts.slice(0, i + 1).join('/'))
     }
 
-    setExpandedFolders(prev => {
+    setExpandedPaths(prev => {
       const next = new Set(prev)
       for (const folderPath of foldersToExpand) {
         next.add(folderPath)
@@ -363,21 +359,30 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
     collection.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const renderTreeNode = (node: TreeNode, level: number = 0, activeFilePath: string | null = null) => {
-    const paddingLeft = level * 14 + 10
+  const flatTree = useFlatTree(collectionTree, expandedPaths)
+
+  const virtualizer = useVirtualizer({
+    count: flatTree.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 32,
+    overscan: 10,
+  })
+
+  const renderFlatRow = (flatNode: FlatTreeNode) => {
+    const { node, depth, isExpanded } = flatNode
 
     if (node.type === 'request') {
-      const isActiveRequest = activeFilePath !== null && activeFilePath === node.path
+      const paddingLeft = 12 + depth * 16
+      const isActiveRequest = activeTabFilePath !== null && activeTabFilePath === node.path
 
       return (
         <div
-          key={node.path || node.name}
           className={`group flex min-h-8 items-center border-l-2 rounded-r-md transition-all ${
             isActiveRequest
               ? 'border-primary bg-accent/70 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
               : 'border-transparent text-foreground/90 hover:bg-accent/45'
           }`}
-          style={{ paddingLeft: `${paddingLeft + 18}px` }}
+          style={{ paddingLeft: `${paddingLeft}px` }}
         >
           <button
             type="button"
@@ -450,72 +455,66 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
 
     if (node.type === 'folder') {
       const folderKey = node.path || node.name
-      const isExpanded = expandedFolders.has(folderKey)
+      const paddingLeft = 12 + depth * 16
+
       return (
-        <div key={node.path || node.name}>
-          <div className="group flex min-h-8 items-center rounded-sm hover:bg-accent/50 transition-colors">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setExpandedFolders(prev => {
-                  const next = new Set(prev)
-                  if (next.has(folderKey)) {
-                    next.delete(folderKey)
-                  } else {
-                    next.add(folderKey)
-                  }
-                  return next
-                })
-              }}
-              className="h-8 flex-1 justify-start gap-1.5 px-2.5 py-1 text-xs hover:bg-transparent"
-              style={{ paddingLeft: `${paddingLeft}px` }}
-            >
-              {isExpanded ? (
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              ) : (
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              )}
-              <Folder className="h-4 w-4 text-orange-500 shrink-0" />
-              <span className="truncate text-left text-xs font-medium">{node.name}</span>
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (!activeCollection) return
-                    openCreateNodeDialog('folder', activeCollection.name, node.path ?? null)
-                  }}
-                >
-                  New Folder
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (!activeCollection) return
-                    openCreateNodeDialog('request', activeCollection.name, node.path ?? null)
-                  }}
-                >
-                  New Request
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          {isExpanded && node.children && (
-            <div>
-              {node.children.map(child => renderTreeNode(child, level + 1, activeFilePath))}
-            </div>
-          )}
+        <div className="group flex min-h-8 items-center rounded-sm hover:bg-accent/50 transition-colors">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setExpandedPaths(prev => {
+                const next = new Set(prev)
+                if (next.has(folderKey)) {
+                  next.delete(folderKey)
+                } else {
+                  next.add(folderKey)
+                }
+                return next
+              })
+            }}
+            className="h-8 flex-1 justify-start gap-1.5 px-2.5 py-1 text-xs hover:bg-transparent"
+            style={{ paddingLeft: `${paddingLeft}px` }}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            )}
+            <Folder className="h-4 w-4 text-orange-500 shrink-0" />
+            <span className="truncate text-left text-xs font-medium">{node.name}</span>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (!activeCollection) return
+                  openCreateNodeDialog('folder', activeCollection.name, node.path ?? null)
+                }}
+              >
+                New Folder
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (!activeCollection) return
+                  openCreateNodeDialog('request', activeCollection.name, node.path ?? null)
+                }}
+              >
+                New Request
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )
     }
@@ -598,7 +597,7 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div ref={scrollRef} className="flex-1 overflow-auto">
         {activeTab === 'collections' ? (
           isCollectionsLoading ? (
             <div className="space-y-1 px-1.5 py-1.5">
@@ -728,9 +727,26 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
                       ))}
                     </div>
                   )}
-                  {isExpanded && isActive && collectionTree?.children && (
-                    <div className="ml-2 border-l border-border/50 pl-1">
-                      {collectionTree.children.map(child => renderTreeNode(child, 0, activeTabFilePath))}
+                  {isExpanded && isActive && flatTree.length > 0 && (
+                    <div
+                      className="ml-2 border-l border-border/50 pl-1"
+                      style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}
+                    >
+                      {virtualizer.getVirtualItems().map(virtualItem => (
+                        <div
+                          key={virtualItem.key}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: `${virtualItem.size}px`,
+                            transform: `translateY(${virtualItem.start}px)`,
+                          }}
+                        >
+                          {renderFlatRow(flatTree[virtualItem.index])}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
