@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useCollections } from '@/features/collections/hooks/useCollections'
 import { useCollectionTree } from '@/features/collections/hooks/useCollectionTree'
 import { useHistoryEntries } from '@/features/history/hooks/useHistoryEntries'
@@ -121,18 +122,17 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
   
   const { loadRequestFromPath, loadRequestInActiveTab, openCollectionOverview } = useTabsStore()
 
-  const activeTabContext = useTabsStore(state => {
-    const tab = state.tabs.find(t => t.id === state.activeTabId)
-    if (!tab || tab.kind !== 'request') {
-      return { collectionName: null, filePath: null }
-    }
-    return {
-      collectionName: tab.collectionName ?? null,
-      filePath: tab.filePath ?? null,
-    }
-  })
-  const activeTabCollectionName = activeTabContext.collectionName
-  const activeTabFilePath = activeTabContext.filePath
+  const { collectionName: activeTabCollectionName, filePath: activeTabFilePath } =
+    useTabsStore(useShallow(state => {
+      const tab = state.tabs.find(t => t.id === state.activeTabId)
+      if (!tab || tab.kind !== 'request') {
+        return { collectionName: null, filePath: null }
+      }
+      return {
+        collectionName: tab.collectionName ?? null,
+        filePath: tab.filePath ?? null,
+      }
+    }))
 
   useEffect(() => {
     fetchCollections()
@@ -204,8 +204,12 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
   ])
 
   const toggleCollection = (id: string) => {
-    setExpandedCollectionId(prev => prev === id ? null : id)
-    setExpandedFolders(new Set())
+    setExpandedCollectionId(prev => {
+      if (prev === id) return null
+      // Switching to a different collection — clear folder state.
+      setExpandedFolders(new Set())
+      return id
+    })
   }
 
   const handleCreateCollection = () => {
@@ -579,7 +583,7 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder="Filter..."
+            placeholder="Filter collections..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-7 pl-7 text-xs"
@@ -596,11 +600,12 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        {isCollectionsLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : activeTab === 'collections' ? (
+        {activeTab === 'collections' ? (
+          isCollectionsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
           <div className="space-y-1 px-1.5 py-1.5">
             {filteredCollections.map((collection) => {
               const isExpanded = expandedCollectionId === collection.id
@@ -618,9 +623,12 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
                       type="button"
                       className="flex min-w-0 flex-1 items-center gap-1.5 px-2.5 py-1.5 text-left"
                       onClick={() => {
+                        const wasExpanded = expandedCollectionId === collection.id
                         toggleCollection(collection.id)
-                        setActiveCollection(collection)
-                        openCollectionOverview(collection.name)
+                        if (!wasExpanded) {
+                          setActiveCollection(collection)
+                          openCollectionOverview(collection.name)
+                        }
                       }}
                     >
                       <span className="shrink-0 h-5 w-5 flex items-center justify-center">
@@ -728,6 +736,7 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
               </div>
             )}
           </div>
+          )
         ) : (
           <div className="flex-1 overflow-auto">
             {historyLoading ? (
@@ -742,16 +751,22 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
                 <p className="text-xs text-muted-foreground mt-1">Send requests to see them here</p>
               </div>
             ) : (
-              <div className="space-y-0.5 p-1">
               <div className="space-y-1 px-1.5 py-1.5">
                 {historyEntries.map((entry) => {
-                  const timestamp = new Date(entry.timestamp).toLocaleTimeString([], { 
-                    hour: '2-digit', 
+                  const timestamp = new Date(entry.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
                     minute: '2-digit',
                     second: '2-digit'
                   })
-                  const urlObj = new URL(entry.url)
-                  const path = urlObj.pathname + urlObj.search
+                  let path = entry.url
+                  let hostname = ''
+                  try {
+                    const urlObj = new URL(entry.url)
+                    path = urlObj.pathname + urlObj.search
+                    hostname = urlObj.hostname
+                  } catch {
+                    // Relative or malformed URL — display as-is.
+                  }
                   const sizeKB = entry.size > 1024 ? `${(entry.size / 1024).toFixed(1)}KB` : `${entry.size}B`
                   
                   return (
@@ -811,14 +826,13 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
                       <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                         <span>⏱ {entry.duration}ms</span>
                         <span>📦 {sizeKB}</span>
-                        <span className="truncate flex-1" title={urlObj.hostname}>
-                          🌐 {urlObj.hostname}
+                        <span className="truncate flex-1" title={hostname}>
+                          🌐 {hostname}
                         </span>
                       </div>
                     </div>
                   )
                 })}
-              </div>
               </div>
             )}
           </div>

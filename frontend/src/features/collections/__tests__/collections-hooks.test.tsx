@@ -32,6 +32,7 @@ const {
     createCollection: vi.fn(),
     deleteCollection: vi.fn(),
     setActiveCollection: vi.fn(),
+    importBruno: vi.fn(),
     exportBruno: vi.fn(),
     exportPostman: vi.fn(),
     fetchEnvironments: fetchEnvironmentsMock,

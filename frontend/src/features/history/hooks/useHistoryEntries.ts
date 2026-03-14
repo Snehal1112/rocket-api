@@ -1,7 +1,8 @@
+import { useShallow } from 'zustand/react/shallow'
 import { useHistoryStore } from '@/store/history'
 
 export function useHistoryEntries() {
-  return useHistoryStore(state => ({
+  return useHistoryStore(useShallow(state => ({
     entries: state.entries,
     isLoading: state.isLoading,
     error: state.error,
@@ -11,7 +12,7 @@ export function useHistoryEntries() {
     deleteEntry: state.deleteEntry,
     clearHistory: state.clearHistory,
     loadEntryToBuilder: state.loadEntryToBuilder,
-  }))
+  })))
 }
 
 export default useHistoryEntries
