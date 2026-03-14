@@ -38,7 +38,6 @@ import {
   Upload,
   Download,
   Trash2,
-  Loader2,
   MoreHorizontal,
 } from 'lucide-react'
 import {
@@ -47,6 +46,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface TreeNode {
   name: string
@@ -602,8 +602,14 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
       <div className="flex-1 overflow-auto">
         {activeTab === 'collections' ? (
           isCollectionsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <div className="space-y-1 px-1.5 py-1.5">
+              {['w-24', 'w-32', 'w-36', 'w-28', 'w-32'].map((width, i) => (
+                <div key={i} className="flex items-center gap-1.5 rounded-sm px-2 py-1.5">
+                  <Skeleton className="h-4 w-4 rounded-full shrink-0" />
+                  <Skeleton className={`h-3 ${width}`} />
+                  <Skeleton className="h-4 w-6 rounded-sm shrink-0 ml-auto" />
+                </div>
+              ))}
             </div>
           ) : (
           <div className="space-y-1 px-1.5 py-1.5">
@@ -645,7 +651,7 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
                           ({collection.requestCount})
                         </span>
                         {isActive && isCollectionTreeLoading && (
-                          <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin shrink-0" />
+                          <Skeleton className="h-3 w-3 rounded-full shrink-0" />
                         )}
                       </span>
                     </button>
@@ -712,6 +718,17 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
                   </div>
 
                   {/* Collection Tree */}
+                  {isExpanded && isActive && isCollectionTreeLoading && (
+                    <div className="ml-2 border-l border-border/50 pl-1">
+                      {[0, 0, 16, 16, 32, 16, 0, 16].map((indent, i) => (
+                        <div key={i} className="flex items-center gap-1.5 py-1" style={{ paddingLeft: indent }}>
+                          <Skeleton className="h-3 w-3 rounded-sm shrink-0" />
+                          <Skeleton className="h-3.5 w-3.5 rounded-full shrink-0" />
+                          <Skeleton className={`h-3 ${['w-20', 'w-28', 'w-24', 'w-32', 'w-20', 'w-28', 'w-24', 'w-32'][i]}`} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {isExpanded && isActive && collectionTree?.children && (
                     <div className="ml-2 border-l border-border/50 pl-1">
                       {collectionTree.children.map(child => renderTreeNode(child, 0, activeTabFilePath))}
@@ -740,9 +757,15 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
         ) : (
           <div className="flex-1 overflow-auto">
             {historyLoading ? (
-              <div className="px-3 py-8 text-center">
-                <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground">Loading history...</p>
+              <div className="space-y-1 px-1.5 py-1.5">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-sm px-2.5 py-1.5">
+                    <Skeleton className="h-4 w-9 rounded-sm shrink-0" />
+                    <Skeleton className="h-2 w-2 rounded-full shrink-0" />
+                    <Skeleton className={`h-3 ${['w-36', 'w-44', 'w-40', 'w-48', 'w-36'][i]}`} />
+                    <Skeleton className="h-3 w-[60px] shrink-0 ml-auto" />
+                  </div>
+                ))}
               </div>
             ) : historyEntries.length === 0 ? (
               <div className="px-3 py-8 text-center">

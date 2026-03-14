@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { CollectionVariablesEditor } from './CollectionVariablesEditor'
 import { CollectionRunnerDialog } from './CollectionRunnerDialog'
 import {
@@ -91,14 +92,14 @@ export function CollectionOverview({ collectionName }: CollectionOverviewProps) 
   if (!stats) {
     return (
       <div className="flex-1 p-6 space-y-4">
-        <div className="h-16 bg-muted animate-pulse rounded-lg" />
+        <Skeleton className="h-16 rounded-lg" />
         <div className="flex gap-3">
-          <div className="h-24 flex-1 bg-muted animate-pulse rounded-lg" />
-          <div className="h-24 flex-1 bg-muted animate-pulse rounded-lg" />
-          <div className="h-24 flex-1 bg-muted animate-pulse rounded-lg" />
-          <div className="h-24 flex-1 bg-muted animate-pulse rounded-lg" />
+          <Skeleton className="h-24 flex-1 rounded-lg" />
+          <Skeleton className="h-24 flex-1 rounded-lg" />
+          <Skeleton className="h-24 flex-1 rounded-lg" />
+          <Skeleton className="h-24 flex-1 rounded-lg" />
         </div>
-        <div className="h-48 bg-muted animate-pulse rounded-lg" />
+        <Skeleton className="h-48 rounded-lg" />
       </div>
     )
   }
