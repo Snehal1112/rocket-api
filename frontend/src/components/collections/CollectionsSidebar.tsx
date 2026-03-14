@@ -57,14 +57,14 @@ interface TreeNode {
 }
 
 interface CollectionsSidebarProps {
-  width?: number
+  initialTab?: 'collections' | 'history'
 }
 
-export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
+export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {}) {
   const [expandedCollectionId, setExpandedCollectionId] = useState<string | null>(null)
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState<'collections' | 'history'>('collections')
+  const [activeTab, setActiveTab] = useState<'collections' | 'history'>(initialTab ?? 'collections')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newCollectionName, setNewCollectionName] = useState('')
   const [createNodeDialog, setCreateNodeDialog] = useState<{
@@ -526,8 +526,7 @@ export function CollectionsSidebar({ width = 288 }: CollectionsSidebarProps) {
   return (
     <TooltipProvider>
     <aside
-      className="border-r border-border/70 bg-card/80 backdrop-blur-sm flex flex-col shrink-0"
-      style={{ width: `${width}px` }}
+      className="border-r border-border/70 bg-card/80 backdrop-blur-sm flex flex-col shrink-0 w-full"
     >
       {/* Sidebar Header */}
       <div className="flex h-11 items-center gap-1.5 border-b border-border/70 bg-card/90 px-2.5">

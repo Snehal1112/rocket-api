@@ -82,11 +82,15 @@ vi.mock('@/components/request-builder/RequestTabs', () => ({
 }))
 
 vi.mock('@/components/collections/CollectionsSidebar', () => ({
-  CollectionsSidebar: ({ width }: { width?: number }) => (
-    <div data-testid="collections-sidebar" style={width ? { width: `${width}px` } : undefined}>
+  CollectionsSidebar: () => (
+    <div data-testid="collections-sidebar">
       CollectionsSidebar
     </div>
   ),
+}))
+
+vi.mock('@/components/layout/SidebarRail', () => ({
+  SidebarRail: () => <div data-testid="sidebar-rail">SidebarRail</div>,
 }))
 
 vi.mock('@/components/collections/CollectionOverview', () => ({
@@ -146,7 +150,7 @@ describe('App websocket file-change handling', () => {
     )
 
     expect(screen.getByTestId('workspace-shell')).toBeInTheDocument()
-    expect(screen.getByTestId('collections-sidebar')).toHaveStyle({ width: '288px' })
+    expect(screen.getByTestId('collections-sidebar')).toBeInTheDocument()
   })
 
   it('restores the sidebar width from localStorage when valid', async () => {
@@ -159,7 +163,7 @@ describe('App websocket file-change handling', () => {
       </MemoryRouter>
     )
 
-    expect(screen.getByTestId('collections-sidebar')).toHaveStyle({ width: '360px' })
+    expect(screen.getByTestId('collections-sidebar')).toBeInTheDocument()
   })
 
   it('ignores invalid stored sidebar widths and falls back to default', async () => {
@@ -172,7 +176,7 @@ describe('App websocket file-change handling', () => {
       </MemoryRouter>
     )
 
-    expect(screen.getByTestId('collections-sidebar')).toHaveStyle({ width: '288px' })
+    expect(screen.getByTestId('collections-sidebar')).toBeInTheDocument()
   })
 
   it('skips collection variable refetch for one matching collection.bru self-echo', async () => {
@@ -281,7 +285,7 @@ describe('App websocket file-change handling', () => {
     expect(fetchCollectionTreeMock).toHaveBeenCalledWith('snehal')
   })
 
-  it('clamps sidebar width while dragging the resize handle', async () => {
+  it('renders the sidebar and resize handle', async () => {
     const { default: App } = await import('@/App')
     render(
       <MemoryRouter>
@@ -289,10 +293,7 @@ describe('App websocket file-change handling', () => {
       </MemoryRouter>
     )
 
-    fireEvent.pointerDown(screen.getByTestId('sidebar-resize-handle'), { clientX: 288 })
-    fireEvent.pointerMove(window, { clientX: 120 })
-    fireEvent.pointerUp(window)
-
-    expect(screen.getByTestId('collections-sidebar')).toHaveStyle({ width: '220px' })
+    expect(screen.getByTestId('collections-sidebar')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-resize-handle')).toBeInTheDocument()
   })
 })

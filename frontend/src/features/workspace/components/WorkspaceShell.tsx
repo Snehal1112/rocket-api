@@ -5,6 +5,7 @@ import { CollectionOverview } from '@/components/collections/CollectionOverview'
 import { GlobalStatusBar } from '@/components/layout/GlobalStatusBar'
 import { ConsolePanel } from '@/components/layout/ConsolePanel'
 import { WelcomeScreen } from '@/components/layout/WelcomeScreen'
+import { SidebarRail } from '@/components/layout/SidebarRail'
 import { useConsoleStore } from '@/store/console'
 import { ThemeProvider, useTheme } from 'next-themes'
 import { useState, useEffect } from 'react'
@@ -15,30 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Outlet } from 'react-router-dom'
 import { useRouteSyncedTabs } from '@/features/workspace/hooks/useRouteSyncedTabs'
 import { useRealtimeSync } from '@/features/realtime/hooks/useRealtimeSync'
-
-const SIDEBAR_WIDTH_STORAGE_KEY = 'rocket-api:sidebar-width'
-const DEFAULT_SIDEBAR_WIDTH = 288
-const MIN_SIDEBAR_WIDTH = 220
-const MAX_SIDEBAR_WIDTH = 520
-
-function clampSidebarWidth(width: number) {
-  return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width))
-}
-
-function getInitialSidebarWidth() {
-  if (typeof window === 'undefined') {
-    return DEFAULT_SIDEBAR_WIDTH
-  }
-
-  const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY))
-  if (!Number.isFinite(stored)) {
-    return DEFAULT_SIDEBAR_WIDTH
-  }
-
-  return stored >= MIN_SIDEBAR_WIDTH && stored <= MAX_SIDEBAR_WIDTH
-    ? stored
-    : DEFAULT_SIDEBAR_WIDTH
-}
+import { useSidebarState } from '@/hooks/use-sidebar-state'
 
 function ThemeToggle() {
   const { setTheme, resolvedTheme } = useTheme()
@@ -100,32 +78,27 @@ export function WorkspaceShell() {
 
   const [isConsoleOpen, setIsConsoleOpen] = useState(false)
   const [consoleHeight, setConsoleHeight] = useState(280)
-  const [sidebarWidth, setSidebarWidth] = useState(getInitialSidebarWidth)
-  const [isSidebarResizing, setIsSidebarResizing] = useState(false)
+  const sidebar = useSidebarState()
 
+  // Ctrl+B keyboard shortcut to toggle sidebar
   useEffect(() => {
-    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth))
-  }, [sidebarWidth])
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'b' && (event.ctrlKey || event.metaKey)) {
+        // Skip when focus is inside Monaco Editor
+        const target = event.target as HTMLElement
+        if (target.closest('.monaco-editor')) return
 
-  useEffect(() => {
-    if (!isSidebarResizing) return
-
-    const handlePointerMove = (event: PointerEvent) => {
-      setSidebarWidth(clampSidebarWidth(event.clientX))
+        event.preventDefault()
+        sidebar.toggle()
+      }
+      // Escape dismisses overlay
+      if (event.key === 'Escape' && sidebar.isOverlayOpen) {
+        sidebar.closeOverlay()
+      }
     }
-
-    const handlePointerUp = () => {
-      setIsSidebarResizing(false)
-    }
-
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
-
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-    }
-  }, [isSidebarResizing])
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [sidebar.isOverlayOpen, sidebar.toggle, sidebar.closeOverlay])
 
   return (
     <ThemeProvider attribute="class" defaultTheme="light" storageKey="rocket-theme" enableSystem>
@@ -157,21 +130,52 @@ export function WorkspaceShell() {
           </div>
         </header>
 
-        <div className="flex-1 flex overflow-hidden">
-          <CollectionsSidebar width={sidebarWidth} />
-          <div
-            data-testid="sidebar-resize-handle"
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize sidebar"
-            onPointerDown={(event) => {
-              event.preventDefault()
-              setIsSidebarResizing(true)
-            }}
-            className={`w-1.5 shrink-0 cursor-col-resize bg-border/35 transition-colors hover:bg-primary/35 ${
-              isSidebarResizing ? 'bg-primary/50' : ''
-            }`}
-          />
+        <div className="flex-1 flex overflow-hidden relative">
+          {sidebar.isCollapsed ? (
+            <SidebarRail
+              activeOverlayTab={sidebar.isOverlayOpen ? sidebar.overlayTab : null}
+              onOpenOverlay={sidebar.openOverlay}
+              onToggle={sidebar.toggle}
+            />
+          ) : (
+            <>
+              <div style={{ width: `${sidebar.sidebarWidth}px` }} className="shrink-0">
+                <CollectionsSidebar />
+              </div>
+              <div
+                data-testid="sidebar-resize-handle"
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize sidebar"
+                onPointerDown={(event) => {
+                  event.preventDefault()
+                  sidebar.startResizing()
+                }}
+                className={`w-1.5 shrink-0 cursor-col-resize bg-border/35 transition-colors hover:bg-primary/35 ${
+                  sidebar.isSidebarResizing ? 'bg-primary/50' : ''
+                }`}
+              />
+            </>
+          )}
+
+          {/* Overlay sidebar */}
+          {sidebar.isCollapsed && sidebar.isOverlayOpen && (
+            <>
+              <div
+                data-testid="sidebar-overlay"
+                className="absolute top-0 bottom-0 z-30 w-[280px] bg-card shadow-xl animate-in slide-in-from-left duration-150"
+                style={{ left: '48px' }}
+              >
+                <CollectionsSidebar initialTab={sidebar.overlayTab} />
+              </div>
+              <div
+                data-testid="sidebar-overlay-backdrop"
+                className="absolute inset-0 z-20 bg-black/20"
+                style={{ left: '48px' }}
+                onClick={sidebar.closeOverlay}
+              />
+            </>
+          )}
 
           <main id="main-content" className="flex-1 flex flex-col min-w-0 bg-transparent">
             <RequestTabs />
