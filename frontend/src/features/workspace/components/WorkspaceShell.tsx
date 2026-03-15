@@ -20,16 +20,6 @@ import { useSidebarState } from '@/hooks/use-sidebar-state'
 
 function ThemeToggle() {
   const { setTheme, resolvedTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return <Button variant="ghost" size="icon" className="h-8 w-8" />
-  }
-
   const isDark = resolvedTheme === 'dark'
 
   return (
