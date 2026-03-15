@@ -550,7 +550,7 @@ export function CollectionsSidebar({ initialTab }: CollectionsSidebarProps = {})
   return (
     <TooltipProvider>
     <aside
-      className="border-r border-border/70 bg-card/80 backdrop-blur-sm flex flex-col shrink-0 w-full"
+      className="border-r border-border/70 bg-card/80 backdrop-blur-sm flex flex-col shrink-0 w-full h-full"
     >
       {/* Sidebar Header */}
       <div className="flex h-11 items-center gap-1.5 border-b border-border/70 bg-card/90 px-2.5">
